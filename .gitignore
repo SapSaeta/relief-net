@@ -1,0 +1,23 @@
+# Secrets: NEVER committed (the repository will be public)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies and builds
+node_modules/
+.next/
+out/
+dist/
+coverage/
+.vercel/
+
+# OS and editor
+.DS_Store
+.idea/
+.vscode/
+
+# Heavy or private material (record locally, do not push without thinking)
+/private/
+*.mov
