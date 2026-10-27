@@ -211,7 +211,14 @@ gantt
 - 👤 **Human in the loop:** a coordinator approves every dispatch, and the AI only proposes.
 - 🧾 **Audit log:** every AI suggestion and human decision is recorded.
 - 🚨 **Emergencies go to 112**, and structural risk goes to professionals. relief-net does not give medical or structural advice.
-- 🔐 **Server-side only:** the API key lives in the server environment and never reaches the browser.
+- 🔐 **Server-side only:** the API key lives in the server environment and never reaches the browser. Upstream error text stays in the server log.
+- 💸 **Spend guard:** every route that calls a paid model needs a demo access code (required in production, fails closed when unset), has a per-IP daily limit, and stops at a global spend cap read from the usage ledger.
+
+| Guard | Setting | Response when hit |
+|---|---|---|
+| Access code (`x-access-code` header) | `DEMO_ACCESS_CODE` | 401 |
+| Calls per IP per day | `MAX_CALLS_PER_IP_PER_DAY` (20) | 429 |
+| Total spend incl. the call's worst case | `SPEND_CAP_USD` (25) | 503 |
 - 🧪 **Synthetic data only:** no real people, companies or clients.
 
 ## 🚀 Getting started
@@ -251,6 +258,7 @@ relief-net/
 │   ├── request.ts               # Muse Spark structured help request (strict JSON schema)
 │   ├── evidence.ts              # deterministic evidence checks (+ evidence.test.ts)
 │   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger
+│   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap
 │   ├── cases.ts                 # local case store (.data/cases)
 │   └── intake.ts                # pipeline orchestration
 ├── docs/

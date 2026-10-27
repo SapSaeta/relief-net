@@ -1,3 +1,4 @@
+import { COST_ESTIMATE_USD, guardPaidCall } from "@/lib/guard";
 import { runIntake } from "@/lib/intake";
 
 // POST multipart/form-data with a `video` field (MP4 or MOV).
@@ -9,6 +10,9 @@ const MAX_BYTES = 200 * 1024 * 1024;
 const ACCEPTED = new Set(["video/mp4", "video/quicktime"]);
 
 export async function POST(request: Request) {
+  const denied = await guardPaidCall(request, COST_ESTIMATE_USD.intake);
+  if (denied) return denied;
+
   const form = await request.formData();
   const video = form.get("video");
 
@@ -26,6 +30,7 @@ export async function POST(request: Request) {
     return Response.json(await runIntake(video));
   } catch (error) {
     console.error("intake failed", error);
-    return Response.json({ error: error instanceof Error ? error.message : "Intake failed" }, { status: 502 });
+    // Upstream error text stays in the server log.
+    return Response.json({ error: "Intake failed. Please try again in a minute." }, { status: 502 });
   }
 }

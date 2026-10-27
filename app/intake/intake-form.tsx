@@ -28,7 +28,9 @@ export function IntakeForm() {
   async function submit(form: FormData) {
     setState({ status: "running", startedAt: Date.now() });
     try {
-      const res = await fetch("/api/intake", { method: "POST", body: form });
+      const accessCode = String(form.get("accessCode") ?? "");
+      form.delete("accessCode");
+      const res = await fetch("/api/intake", { method: "POST", body: form, headers: { "x-access-code": accessCode } });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
       setState({ status: "done", intake: json });
@@ -47,6 +49,13 @@ export function IntakeForm() {
           capture="environment"
           required
           className="flex-1 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-foreground/10 file:px-3 file:py-2"
+        />
+        <input
+          name="accessCode"
+          type="password"
+          placeholder="Demo access code"
+          autoComplete="off"
+          className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm sm:w-44"
         />
         <button
           type="submit"

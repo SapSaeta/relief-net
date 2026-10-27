@@ -83,7 +83,8 @@ export async function runIntake(video: File): Promise<IntakeCase> {
         draftHelpRequest({ fileId: file.id, transcript, frames: segmented }, ledger),
       );
     } catch (error) {
-      requestError = error instanceof Error ? error.message : "Help request failed";
+      console.error("help request failed", error);
+      requestError = "drafting failed; it can be retried";
     }
 
     const intake: IntakeCase = {
