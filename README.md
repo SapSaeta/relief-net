@@ -14,7 +14,7 @@ From a phone video of a damaged home to a prioritized, evidence-backed help requ
 ![Voice](https://img.shields.io/badge/Muse_Voice_Transcribe-1.0-0866FF?style=flat-square&logo=meta&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)
 ![Data](https://img.shields.io/badge/data-100%25_synthetic-2EA44F?style=flat-square)
-![Status](https://img.shields.io/badge/status-day_1_·_intake_pipeline-F2A900?style=flat-square)
+![Status](https://img.shields.io/badge/status-day_2_·_verified_help_requests-F2A900?style=flat-square)
 
 </div>
 
@@ -33,11 +33,13 @@ flowchart LR
     A["📱 Affected person<br/>records a video walkthrough<br/>with voice"] --> P["🎞️ ffmpeg<br/>audio + key frames"]
     P --> C["🎙️ Muse Voice Transcribe<br/>what they say"]
     P --> E["🎯 SAM 3.1<br/>where the damage is"]
+    P --> S["🧠 Muse Spark scout<br/>what else to look for"] --> E
     A --> B["☁️ Files API<br/>video upload"]
     C --> F["🧠 Muse Spark<br/>structured help request<br/>+ evidence per frame"]
     E --> F
     B --> F
-    F --> G["📋 Coordinator dashboard<br/>dedupe · prioritize · match"]
+    F --> V["🔍 Code verifies<br/>every citation"] --> G
+    G["📋 Coordinator dashboard<br/>dedupe · prioritize · match"]
     G --> H{"👤 Human<br/>approves?"}
     H -- yes --> I["🚚 Dispatch volunteers<br/>& resources"]
     H -- no --> G
@@ -45,13 +47,17 @@ flowchart LR
     H -.-> J
 ```
 
-## 🎥 Intake pipeline (working)
+## 🎥 Intake → verified help request (working)
 
-One synthetic 19-second walkthrough → transcript + damage masks in **~12 s**. Damage found by SAM 3.1 on key frames:
+A synthetic 19-second walkthrough becomes a prioritized help request in **under a minute for ≈ $0.17**. Every claim cites evidence, and the evidence is checked in code:
+
+![Help request with verified evidence and damage proposed by Muse Spark](docs/assets/case-help-request.jpg)
+
+Damage masks from SAM 3.1 on the key frames:
 
 ![SAM 3.1 damage masks on synthetic intake frames](docs/assets/intake-sam-overlay.jpg)
 
-<sub>🔴 crack · 🟤 mud · 🟠 debris · 🔵 broken window · 🟢 mold. All images are synthetic, generated with Muse Image.</sub>
+<sub>🔴 crack · 🟤 mud · 🟠 debris · 🔵 broken window · 🟢 mold · 🟣🩷 damage proposed by Muse Spark. All images are synthetic, generated with Muse Image.</sub>
 
 ```mermaid
 sequenceDiagram
@@ -64,24 +70,55 @@ sequenceDiagram
     par in parallel
         N->>M: Files API upload (purpose user_data, 7-day expiry)
     and
-        N->>M: /asr/transcribe (muse-voice-transcribe-1.0, ENDPOINTING)
+        N->>M: /asr/transcribe (muse-voice-transcribe-1.0)
     and
-        N->>M: sam-3.1 × (frames × 5 damage concepts), 6 concurrent, streamed
+        N->>M: sam-3.1 × (8 frames × 5 fixed damage concepts)
+    and
+        N->>M: muse-spark-1.3 looks at the frames, proposes extra damage
+        N->>M: sam-3.1 grounds each proposal on its frames only
     end
-    M-->>N: file_id · transcript + turns · boxes + masks
-    N-->>U: case JSON (stored in .data/cases)
-    U->>U: draw masks over each frame
+    N->>M: muse-spark-1.3 + video file_id + transcript + detections → strict JSON help request
+    N->>N: verify every cited quote and frame
+    N-->>U: case (stored in .data/cases) + cost
 ```
 
-| Step | Typical time |
-|---|---:|
-| ffmpeg prepare | 1.6 s |
-| Files API upload | 3.6 s |
-| Transcription | 5.1 s |
-| SAM 3.1 (8 frames × 5 concepts) | 9.8 s |
-| **Total (parallel)** | **≈ 12 s** |
+### 🔍 Verifiable by design
 
-> 💡 **Finding:** SAM segments *objects* well and *textures* poorly. On a moldy wall, `"mold"` returns nothing while `"black spots"` finds it. Each damage label therefore has its own SAM prompt. Next step: let Muse Spark look at the video and propose the noun phrases for SAM to ground.
+The model never gets the last word on facts. Each household fact, damage item and need cites a **transcript quote** or a **frame + damage label**, and code checks it:
+
+| Evidence | Check | Rejected when |
+|---|---|---|
+| `“Two adults and one child live here.”` | quote appears in the transcript (case/punctuation-insensitive) | the model paraphrases or invents |
+| `frame 2 · mud` | SAM 3.1 detected `mud` in frame 2 | wrong frame, or damage SAM never saw |
+
+Unit tests (`npm test`) cover invented quotes, undetected damage, missing frames and empty citations.
+
+### 🤖 Agentic grounding
+
+SAM segments *objects* well and *textures* poorly: on a moldy wall `"mold"` finds nothing while `"black spots"` does. So relief-net combines a fixed list of damage prompts with a **scout**: Muse Spark looks at the numbered key frames, proposes up to 4 more kinds of damage as SAM-friendly noun phrases on specific frames, and SAM tries to locate each one.
+
+```mermaid
+flowchart LR
+    S["🧠 Muse Spark<br/>'overturned chair' → 'broken chair' on frames 2, 3"] --> G["🎯 SAM 3.1<br/>segment only frames 2, 3"]
+    G -->|found| E["✓ usable as evidence"]
+    G -->|not found| X["✗ shown, never trusted"]
+```
+
+On the test walkthrough Spark proposed 4 items; SAM located 2 (overturned chair, soiled sofa) and rejected 2 textures (standing water, peeling paint).
+
+### 💰 Cost and time per case (measured)
+
+| Step | Calls | Time | Cost |
+|---|---:|---:|---:|
+| ffmpeg prepare | – | 1.7 s | – |
+| Files API upload | 1 | 4.3 s | – |
+| Muse Voice Transcribe | 1 | 5.6 s | $0.001 |
+| SAM 3.1, fixed concepts | 40 images | 10.2 s | $0.100 |
+| Scout: Spark + SAM grounding | 1 + 8 images | 7.3 s | $0.030 |
+| Muse Spark help request (≈ 6.7k in / 5.3k out tokens) | 1 | 25–38 s | $0.033 |
+| **Total** | **51** | **≈ 47 s** | **≈ $0.17** |
+
+Every model call is recorded with tokens or units, latency and cost (`.data/usage.jsonl`); `GET /api/usage` returns running totals.
 
 ## 🧩 Architecture
 
@@ -95,6 +132,8 @@ flowchart TB
         R1["/api/intake"]
         R2["/api/triage"]
         LIB["lib/meta.ts<br/>openai SDK · Responses API"]
+        VER["lib/evidence.ts<br/>verifies citations"]
+        LED[("Usage ledger<br/>tokens · latency · cost")]
         LOG[(Audit log)]
     end
     subgraph Meta["Meta Model API"]
@@ -103,11 +142,17 @@ flowchart TB
         M3[sam-3.1]
         M4[muse-spark-1.3]
     end
+    subgraph Open["Open weights · Baseten"]
+        O1[muse-spark-open]
+    end
     UI1 --> R1
     UI2 --> R2
     R1 --> LIB
     R2 --> LIB
     LIB --> M1 & M2 & M3 & M4
+    R2 -.->|provider switch| O1
+    R1 --> VER
+    LIB --> LED
     R1 & R2 --> LOG
 ```
 
@@ -115,8 +160,8 @@ flowchart TB
 
 | Model | Role in relief-net |
 |---|---|
-| `muse-spark-1.3` | Structured help request, deduplication, prioritization, tool calls to match volunteers/resources, explained reasoning, draft insurance/aid report |
-| `sam-3.1` | Segments visible damage on video frames as evidence |
+| `muse-spark-1.3` | Structured help request (strict JSON schema, video input), scout that proposes what SAM should look for; next: deduplication, prioritization, tool calls to match volunteers/resources, draft insurance/aid report |
+| `sam-3.1` | Segments visible damage on key frames as evidence, including damage proposed by Spark |
 | `muse-voice-transcribe-1.0` | Transcribes the narrated walkthrough |
 | Files API (`purpose: "user_data"`) | Video upload |
 | `muse-image-1.0` | Generates the synthetic test scenes (no real photos are used) |
@@ -130,7 +175,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 |---|---|:---:|
 | Oct 26 | Kickoff, API check, repo | ✅ |
 | Oct 27 | Next.js scaffold, video upload, transcription + segmentation pipeline | ✅ |
-| Oct 28 | Structured request with per-frame evidence | ⬜ |
+| Oct 28 | Structured request with per-frame evidence · evidence verification · agentic grounding · cost ledger | ✅ |
 | Oct 29 | Coordinator dashboard: list, dedupe, priority · provider switch Meta ↔ open weights (Baseten) | ⬜ |
 | Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ⬜ |
 | Oct 31 | Human approval, audit log, safety rules | ⬜ |
@@ -175,7 +220,9 @@ node scripts/check-meta-api.mjs   # lists your models and pings muse-spark-1.3
 node scripts/make-fixture.mjs     # synthetic flood walkthrough → private/fixtures/intake-flood.mp4 (macOS)
 npm run dev                       # http://localhost:3000
 curl localhost:3000/api/health    # {"ok":true,"model":"muse-spark-1.3","reply":"OK",...}
-open http://localhost:3000/intake # upload the walkthrough and see the damage masks
+open http://localhost:3000/intake # upload the walkthrough: help request + damage masks
+npm test                          # evidence verification tests
+curl localhost:3000/api/usage     # calls, tokens and estimated cost so far
 ```
 
 ## 📁 Repository layout
@@ -184,8 +231,11 @@ open http://localhost:3000/intake # upload the walkthrough and see the damage ma
 relief-net/
 ├── app/
 │   ├── api/health/route.ts      # GET: minimal Muse Spark round trip
-│   ├── api/intake/route.ts      # POST video → transcript + damage segmentation
-│   ├── intake/                  # intake page: upload + mask overlays
+│   ├── api/intake/route.ts      # POST video → verified help request
+│   ├── api/cases/[id]/request/  # re-draft the help request of a stored case
+│   ├── api/usage/route.ts       # GET running usage and cost totals
+│   ├── cases/[id]/page.tsx      # view a stored case
+│   ├── intake/                  # intake page: upload, help request card, mask overlays
 │   ├── layout.tsx
 │   └── page.tsx                 # landing page
 ├── lib/
@@ -193,7 +243,12 @@ relief-net/
 │   ├── media.ts                 # ffmpeg: MP4 faststart, WAV 24 kHz, key frames
 │   ├── transcribe.ts            # Muse Voice Transcribe (/asr/transcribe)
 │   ├── segment.ts               # SAM 3.1 damage concepts on frames
-│   └── intake.ts                # pipeline orchestration + case store
+│   ├── scout.ts                 # Muse Spark proposes extra damage for SAM to ground
+│   ├── request.ts               # Muse Spark structured help request (strict JSON schema)
+│   ├── evidence.ts              # deterministic evidence checks (+ evidence.test.ts)
+│   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger
+│   ├── cases.ts                 # local case store (.data/cases)
+│   └── intake.ts                # pipeline orchestration
 ├── docs/
 │   ├── assets/                  # screenshots (synthetic data only)
 │   ├── PLAN.md                  # 10-day build plan
