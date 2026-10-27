@@ -21,3 +21,11 @@ coverage/
 # Heavy or private material (record locally, do not push without thinking)
 /private/
 *.mov
+
+# Next.js / TypeScript
+/build
+.pnp
+.pnp.*
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
