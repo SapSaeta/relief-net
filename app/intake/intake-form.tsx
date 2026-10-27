@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import type { IntakeCase } from "@/lib/cases";
 
+import { HelpRequestCard } from "./help-request-card";
+
 const COLORS: Record<string, string> = {
   crack: "#e5484d",
   mud: "#a16207",
@@ -50,7 +52,7 @@ export function IntakeForm() {
       </form>
 
       {state.status === "running" && (
-        <p className="text-sm text-foreground/60">Uploading, transcribing and segmenting damage. This takes about 15 seconds.</p>
+        <p className="text-sm text-foreground/60">Uploading, transcribing, segmenting damage and drafting the help request. This takes about 40 seconds.</p>
       )}
       {state.status === "error" && <p className="text-sm text-red-600">{state.message}</p>}
       {state.status === "done" && <IntakeResult intake={state.intake} />}
@@ -58,7 +60,7 @@ export function IntakeForm() {
   );
 }
 
-function IntakeResult({ intake }: { intake: IntakeCase }) {
+export function IntakeResult({ intake }: { intake: IntakeCase }) {
   const totals = new Map<string, number>();
   for (const frame of intake.frames) for (const d of frame.detections) totals.set(d.concept, (totals.get(d.concept) ?? 0) + 1);
 
@@ -72,12 +74,21 @@ function IntakeResult({ intake }: { intake: IntakeCase }) {
           </span>
         ))}
         <span className="ml-auto text-foreground/50">
-          {intake.durationSec.toFixed(1)} s video · {intake.fileId} ·{" "}
+          {intake.durationSec.toFixed(1)} s video · ${intake.costUsd.toFixed(3)} · {intake.usage.length} model calls ·{" "}
           {Object.entries(intake.timingsMs)
             .map(([k, v]) => `${k} ${(v / 1000).toFixed(1)} s`)
             .join(" · ")}
         </span>
       </section>
+
+      {intake.request ? (
+        <HelpRequestCard request={intake.request} />
+      ) : (
+        <p className="rounded-xl border border-orange-500/50 p-5 text-sm">
+          The help request could not be drafted ({intake.requestError ?? "unknown error"}). The transcript and damage evidence below were
+          saved.
+        </p>
+      )}
 
       <section className="rounded-xl border border-foreground/15 p-5">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-foreground/50">Transcript</h2>
@@ -86,7 +97,7 @@ function IntakeResult({ intake }: { intake: IntakeCase }) {
 
       <section className="grid gap-4 sm:grid-cols-2">
         {intake.frames.map((frame) => (
-          <figure key={frame.index} className="overflow-hidden rounded-xl border border-foreground/15">
+          <figure key={frame.index} id={`frame-${frame.index}`} className="scroll-mt-4 overflow-hidden rounded-xl border border-foreground/15">
             <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element -- local data URL frame */}
               <img src={frame.image} alt={`Frame at ${frame.timeSec} s`} className="block w-full" />
@@ -114,7 +125,7 @@ function IntakeResult({ intake }: { intake: IntakeCase }) {
               </svg>
             </div>
             <figcaption className="px-3 py-2 text-xs text-foreground/60">
-              {frame.timeSec.toFixed(1)} s ·{" "}
+              Frame {frame.index} · {frame.timeSec.toFixed(1)} s ·{" "}
               {frame.detections.length
                 ? [...new Set(frame.detections.map((d) => d.concept))].join(", ")
                 : "no damage detected"}
