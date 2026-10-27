@@ -120,7 +120,7 @@ flowchart TB
 | `muse-voice-transcribe-1.0` | Transcribes the narrated walkthrough |
 | Files API (`purpose: "user_data"`) | Video upload |
 | `muse-image-1.0` | Generates the synthetic test scenes (no real photos are used) |
-| Muse Spark Open / Muse Glimmer *(stretch)* | Open-weights option via Baseten or Modal |
+| `meta-models/muse-spark-open-1026` on Baseten | Open-weights option for the coordinator side (triage, dedupe, tool-call matching), so sensitive request data can stay on infrastructure the relief organization controls. Verified: tool calling, strict JSON schema, Responses API |
 
 Only Standard models are used. The `*-contributor` variants are avoided so that data is not used for training.
 
@@ -131,11 +131,11 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 26 | Kickoff, API check, repo | ✅ |
 | Oct 27 | Next.js scaffold, video upload, transcription + segmentation pipeline | ✅ |
 | Oct 28 | Structured request with per-frame evidence | ⬜ |
-| Oct 29 | Coordinator dashboard: list, dedupe, priority | ⬜ |
+| Oct 29 | Coordinator dashboard: list, dedupe, priority · provider switch Meta ↔ open weights (Baseten) | ⬜ |
 | Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ⬜ |
 | Oct 31 | Human approval, audit log, safety rules | ⬜ |
 | Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ⬜ |
-| Nov 2 | Measurement vs manual baseline (15 requests), open-weights option | ⬜ |
+| Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | ⬜ |
 | Nov 3 | Polish, Vercel deploy, demo video | ⬜ |
 | Nov 4 | Submission | ⬜ |
 
@@ -148,12 +148,12 @@ gantt
     Scaffold + upload + pipeline   :a1, 2026-10-27, 1d
     Structured request + evidence  :a2, after a1, 1d
     section Coordination
-    Dashboard + dedupe + priority  :b1, 2026-10-29, 1d
+    Dashboard + open-weights switch :b1, 2026-10-29, 1d
     Matching via tool calls        :b2, after b1, 1d
     Human approval + audit log     :b3, after b2, 1d
     section Delivery
     Report + end-to-end scenario   :c1, 2026-11-01, 1d
-    Baseline measurement           :c2, after c1, 1d
+    Baseline: Meta vs open weights :c2, after c1, 1d
     Polish + deploy + video        :c3, after c2, 1d
     Submit                         :milestone, 2026-11-04, 0d
 ```
