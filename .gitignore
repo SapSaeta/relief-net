@@ -29,3 +29,6 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 npm-debug.log*
+
+# Local case store (synthetic test runs)
+/.data/
