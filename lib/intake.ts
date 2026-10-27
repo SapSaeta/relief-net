@@ -10,12 +10,14 @@ import { saveCase, type IntakeCase } from "@/lib/cases";
 import { extractAudioWav, extractFrames, normalizeVideo, probeDurationSec } from "@/lib/media";
 import { meta } from "@/lib/meta";
 import { draftHelpRequest } from "@/lib/request";
-import { DAMAGE_CONCEPTS, segmentFrames } from "@/lib/segment";
+import { groundProposals, proposalJobs, proposeConcepts, type GroundedProposal } from "@/lib/scout";
+import { allPairs, DAMAGE_CONCEPTS, groupByFrame, segment } from "@/lib/segment";
 import { transcribe } from "@/lib/transcribe";
 import { UsageLedger } from "@/lib/usage";
 
-// Intake pipeline: video -> (Files API upload ‖ transcription ‖ SAM on key frames)
-// -> Muse Spark structured help request with verified evidence.
+// Intake pipeline: video -> (Files API upload ‖ transcription ‖ SAM fixed concepts on key frames
+// ‖ Spark proposes extra damage on the key frames -> SAM grounds it) -> Muse Spark structured
+// help request with verified evidence.
 
 const UPLOAD_TTL_SECONDS = 7 * 24 * 3600;
 
@@ -46,17 +48,32 @@ export async function runIntake(video: File): Promise<IntakeCase> {
     });
     const frames = await extractFrames(mp4, durationSec, work);
 
-    const [file, transcript, segmented] = await Promise.all([
-      timed(timingsMs, "upload", async () =>
-        meta().files.create({
-          purpose: "user_data",
-          file: await toFile(await readFile(mp4), "intake.mp4", { type: "video/mp4" }),
-          expires_after: { anchor: "created_at", seconds: UPLOAD_TTL_SECONDS },
-        }),
-      ),
+    const upload = timed(timingsMs, "upload", async () =>
+      meta().files.create({
+        purpose: "user_data",
+        file: await toFile(await readFile(mp4), "intake.mp4", { type: "video/mp4" }),
+        expires_after: { anchor: "created_at", seconds: UPLOAD_TTL_SECONDS },
+      }),
+    );
+    // Optional: a failed scout only means no extra concepts.
+    const scouted = timed(timingsMs, "scout", async () => {
+      try {
+        const proposals = await proposeConcepts({ frames }, ledger);
+        const results = await segment(proposalJobs(frames, proposals), ledger);
+        return { results, proposals: groundProposals(proposals, results) };
+      } catch (error) {
+        console.error("scout failed", error);
+        return { results: [], proposals: [] as GroundedProposal[] };
+      }
+    });
+
+    const [file, transcript, fixed, scout] = await Promise.all([
+      upload,
       timed(timingsMs, "transcribe", async () => transcribe(await readFile(wav), ledger)),
-      timed(timingsMs, "segment", () => segmentFrames(frames, DAMAGE_CONCEPTS, ledger)),
+      timed(timingsMs, "segment", () => segment(allPairs(frames, DAMAGE_CONCEPTS), ledger)),
+      scouted,
     ]);
+    const segmented = groupByFrame(frames, [...fixed, ...scout.results]);
 
     // A failed draft must not lose the evidence already paid for: keep the case and the error.
     let request: IntakeCase["request"] = null;
@@ -79,6 +96,7 @@ export async function runIntake(video: File): Promise<IntakeCase> {
         ...f,
         image: `data:image/jpeg;base64,${frames[f.index].jpeg.toString("base64")}`,
       })),
+      proposals: scout.proposals,
       request,
       requestError,
       timingsMs,

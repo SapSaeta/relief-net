@@ -13,6 +13,12 @@ const COLORS: Record<string, string> = {
   "broken window": "#3b82f6",
   mold: "#22c55e",
 };
+// Concepts proposed by Muse Spark get colors from a separate palette.
+const PROPOSED_PALETTE = ["#a855f7", "#ec4899", "#14b8a6", "#64748b"];
+
+function colorFor(concept: string, proposed: string[]): string {
+  return COLORS[concept] ?? PROPOSED_PALETTE[Math.max(0, proposed.indexOf(concept)) % PROPOSED_PALETTE.length];
+}
 
 type State = { status: "idle" } | { status: "running"; startedAt: number } | { status: "done"; intake: IntakeCase } | { status: "error"; message: string };
 
@@ -52,7 +58,7 @@ export function IntakeForm() {
       </form>
 
       {state.status === "running" && (
-        <p className="text-sm text-foreground/60">Uploading, transcribing, segmenting damage and drafting the help request. This takes about 40 seconds.</p>
+        <p className="text-sm text-foreground/60">Uploading, transcribing, segmenting damage and drafting the help request. This takes under a minute.</p>
       )}
       {state.status === "error" && <p className="text-sm text-red-600">{state.message}</p>}
       {state.status === "done" && <IntakeResult intake={state.intake} />}
@@ -61,6 +67,8 @@ export function IntakeForm() {
 }
 
 export function IntakeResult({ intake }: { intake: IntakeCase }) {
+  const proposed = (intake.proposals ?? []).map((p) => p.label);
+  const color = (concept: string) => colorFor(concept, proposed);
   const totals = new Map<string, number>();
   for (const frame of intake.frames) for (const d of frame.detections) totals.set(d.concept, (totals.get(d.concept) ?? 0) + 1);
 
@@ -69,7 +77,7 @@ export function IntakeResult({ intake }: { intake: IntakeCase }) {
       <section className="flex flex-wrap gap-2 text-xs">
         {[...totals].map(([concept, count]) => (
           <span key={concept} className="flex items-center gap-1.5 rounded-full border border-foreground/15 px-3 py-1">
-            <span className="size-2.5 rounded-full" style={{ background: COLORS[concept] }} />
+            <span className="size-2.5 rounded-full" style={{ background: color(concept) }} />
             {concept} · {count}
           </span>
         ))}
@@ -80,6 +88,32 @@ export function IntakeResult({ intake }: { intake: IntakeCase }) {
             .join(" · ")}
         </span>
       </section>
+
+      {intake.proposals && intake.proposals.length > 0 && (
+        <section className="rounded-xl border border-foreground/15 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">Extra damage proposed by Muse Spark</h2>
+          <p className="mt-1 text-xs text-foreground/60">
+            Spark looked at the key frames and suggested what else to search for; SAM 3.1 then tried to locate it. Proposals SAM could
+            not find are not used as evidence.
+          </p>
+          <ul className="mt-3 flex flex-col gap-2 text-sm">
+            {intake.proposals.map((p) => (
+              <li key={p.label} className="flex flex-wrap items-baseline gap-2">
+                <span className={p.grounded ? "text-green-700 dark:text-green-400" : "text-foreground/40"}>
+                  {p.grounded ? "✓ found" : "✗ not found"}
+                </span>
+                <span className="size-2.5 self-center rounded-full" style={{ background: color(p.label) }} />
+                <span className="font-medium">{p.label}</span>
+                <span className="text-xs text-foreground/50">
+                  SAM prompt “{p.prompt}” · frames {p.frameIndices.join(", ")}
+                  {p.grounded ? ` · ${p.detections} region${p.detections === 1 ? "" : "s"}` : ""}
+                </span>
+                <span className="w-full pl-[4.5rem] text-xs text-foreground/60">{p.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {intake.request ? (
         <HelpRequestCard request={intake.request} />
@@ -107,7 +141,7 @@ export function IntakeResult({ intake }: { intake: IntakeCase }) {
                     <path
                       d={d.maskPath}
                       fillRule="evenodd"
-                      fill={COLORS[d.concept]}
+                      fill={color(d.concept)}
                       fillOpacity={0.45}
                       transform={`translate(${d.box.left} ${d.box.top}) scale(${(d.box.right - d.box.left) / d.maskSize.width} ${(d.box.bottom - d.box.top) / d.maskSize.height})`}
                     />
@@ -117,7 +151,7 @@ export function IntakeResult({ intake }: { intake: IntakeCase }) {
                       width={d.box.right - d.box.left}
                       height={d.box.bottom - d.box.top}
                       fill="none"
-                      stroke={COLORS[d.concept]}
+                      stroke={color(d.concept)}
                       strokeWidth={2}
                     />
                   </g>

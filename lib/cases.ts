@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { HelpRequest } from "@/lib/request";
+import type { GroundedProposal } from "@/lib/scout";
 import type { SegmentedFrame } from "@/lib/segment";
 import type { Transcript } from "@/lib/transcribe";
 import type { UsageEntry } from "@/lib/usage";
@@ -19,6 +20,8 @@ export type IntakeCase = {
   durationSec: number;
   transcript: Transcript;
   frames: (SegmentedFrame & { image: string })[];
+  /** Extra damage Muse Spark proposed and SAM tried to ground (absent on older cases). */
+  proposals?: GroundedProposal[];
   request: HelpRequest | null;
   requestError?: string;
   timingsMs: Record<string, number>;

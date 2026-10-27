@@ -12,7 +12,8 @@ import type { UsageLedger } from "@/lib/usage";
 
 // `prompt` is the noun phrase SAM responds to best: it segments objects well and
 // textures poorly (e.g. "mold" finds nothing on a moldy wall, "black spots" does).
-export type Concept = { label: string; prompt: string };
+/** `proposed` concepts come from Muse Spark watching the video (see lib/scout.ts). */
+export type Concept = { label: string; prompt: string; source?: "fixed" | "proposed" };
 
 export const DAMAGE_CONCEPTS: Concept[] = [
   { label: "crack", prompt: "crack" },
@@ -28,6 +29,7 @@ const MIN_AREA_PCT = 0.2;
 
 export type Detection = {
   concept: string;
+  source: "fixed" | "proposed";
   objectId: string;
   box: { left: number; top: number; right: number; bottom: number };
   confidence?: number;
@@ -78,6 +80,7 @@ async function segmentOne(frame: Frame, concept: Concept, ledger: UsageLedger): 
     const covered = (on / raster.length) * boxArea;
     return {
       concept: concept.label,
+      source: concept.source ?? "fixed",
       objectId: m.objectId,
       box: { ...m.bounds },
       confidence: m.confidence ?? boxes.get(m.objectId)?.confidence,
@@ -103,15 +106,24 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>
   return results;
 }
 
-export async function segmentFrames(frames: Frame[], concepts: Concept[], ledger: UsageLedger): Promise<SegmentedFrame[]> {
-  const jobs = frames.flatMap((frame) => concepts.map((concept) => ({ frame, concept })));
-  const results = await pool(jobs, CONCURRENCY, ({ frame, concept }) => segmentOne(frame, concept, ledger));
+export type SegmentJob = { frame: Frame; concept: Concept };
+export type SegmentResult = SegmentJob & { detections: Detection[] };
 
+export async function segment(jobs: SegmentJob[], ledger: UsageLedger): Promise<SegmentResult[]> {
+  const results = await pool(jobs, CONCURRENCY, ({ frame, concept }) => segmentOne(frame, concept, ledger));
+  return jobs.map((job, i) => ({ ...job, detections: results[i] }));
+}
+
+/** Every concept on every frame. */
+export const allPairs = (frames: Frame[], concepts: Concept[]): SegmentJob[] =>
+  frames.flatMap((frame) => concepts.map((concept) => ({ frame, concept })));
+
+export function groupByFrame(frames: Frame[], results: SegmentResult[]): SegmentedFrame[] {
   return frames.map(({ index, timeSec, width, height }) => ({
     index,
     timeSec,
     width,
     height,
-    detections: results.filter((_, i) => jobs[i].frame.index === index).flat(),
+    detections: results.filter((r) => r.frame.index === index).flatMap((r) => r.detections),
   }));
 }
