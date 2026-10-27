@@ -1,31 +1,23 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { toFile } from "openai";
 
+import { saveCase, type IntakeCase } from "@/lib/cases";
 import { extractAudioWav, extractFrames, normalizeVideo, probeDurationSec } from "@/lib/media";
 import { meta } from "@/lib/meta";
-import { segmentFrames, type SegmentedFrame } from "@/lib/segment";
-import { transcribe, type Transcript } from "@/lib/transcribe";
+import { draftHelpRequest } from "@/lib/request";
+import { DAMAGE_CONCEPTS, segmentFrames } from "@/lib/segment";
+import { transcribe } from "@/lib/transcribe";
+import { UsageLedger } from "@/lib/usage";
 
-// Intake pipeline: video -> (Files API upload ‖ transcription ‖ SAM on key frames).
-// Cases are stored as JSON under .data/cases (git-ignored, local only for now).
+// Intake pipeline: video -> (Files API upload ‖ transcription ‖ SAM on key frames)
+// -> Muse Spark structured help request with verified evidence.
 
 const UPLOAD_TTL_SECONDS = 7 * 24 * 3600;
-const CASES_DIR = join(process.cwd(), ".data", "cases");
-
-export type IntakeCase = {
-  id: string;
-  createdAt: string;
-  fileId: string;
-  durationSec: number;
-  transcript: Transcript;
-  frames: (SegmentedFrame & { image: string })[];
-  timingsMs: Record<string, number>;
-};
 
 async function timed<T>(timings: Record<string, number>, label: string, fn: () => Promise<T>): Promise<T> {
   const started = Date.now();
@@ -37,6 +29,8 @@ async function timed<T>(timings: Record<string, number>, label: string, fn: () =
 }
 
 export async function runIntake(video: File): Promise<IntakeCase> {
+  const id = randomUUID();
+  const ledger = new UsageLedger(id);
   const work = await mkdtemp(join(tmpdir(), "relief-net-"));
   const timingsMs: Record<string, number> = {};
   try {
@@ -60,12 +54,23 @@ export async function runIntake(video: File): Promise<IntakeCase> {
           expires_after: { anchor: "created_at", seconds: UPLOAD_TTL_SECONDS },
         }),
       ),
-      timed(timingsMs, "transcribe", async () => transcribe(await readFile(wav))),
-      timed(timingsMs, "segment", () => segmentFrames(frames)),
+      timed(timingsMs, "transcribe", async () => transcribe(await readFile(wav), ledger)),
+      timed(timingsMs, "segment", () => segmentFrames(frames, DAMAGE_CONCEPTS, ledger)),
     ]);
 
+    // A failed draft must not lose the evidence already paid for: keep the case and the error.
+    let request: IntakeCase["request"] = null;
+    let requestError: string | undefined;
+    try {
+      request = await timed(timingsMs, "request", () =>
+        draftHelpRequest({ fileId: file.id, transcript, frames: segmented }, ledger),
+      );
+    } catch (error) {
+      requestError = error instanceof Error ? error.message : "Help request failed";
+    }
+
     const intake: IntakeCase = {
-      id: randomUUID(),
+      id,
       createdAt: new Date().toISOString(),
       fileId: file.id,
       durationSec,
@@ -74,13 +79,16 @@ export async function runIntake(video: File): Promise<IntakeCase> {
         ...f,
         image: `data:image/jpeg;base64,${frames[f.index].jpeg.toString("base64")}`,
       })),
+      request,
+      requestError,
       timingsMs,
+      usage: ledger.entries,
+      costUsd: ledger.totalUsd,
     };
-
-    await mkdir(CASES_DIR, { recursive: true });
-    await writeFile(join(CASES_DIR, `${intake.id}.json`), JSON.stringify(intake));
+    await saveCase(intake);
     return intake;
   } finally {
+    await ledger.flush();
     await rm(work, { recursive: true, force: true });
   }
 }

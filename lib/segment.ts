@@ -4,20 +4,23 @@ import { decodeMaskToRaster, decodeMaskToSVGPath, parseImageStream, recordsOfKin
 
 import type { Frame } from "@/lib/media";
 import { meta, models } from "@/lib/meta";
+import { UNIT_PRICES } from "@/lib/pricing";
+import type { UsageLedger } from "@/lib/usage";
 
 // SAM 3.1 damage segmentation on key frames. SAM takes one concept per request,
 // so every (frame, concept) pair is its own call, with bounded concurrency.
 
 // `prompt` is the noun phrase SAM responds to best: it segments objects well and
 // textures poorly (e.g. "mold" finds nothing on a moldy wall, "black spots" does).
-export const DAMAGE_CONCEPTS = [
+export type Concept = { label: string; prompt: string };
+
+export const DAMAGE_CONCEPTS: Concept[] = [
   { label: "crack", prompt: "crack" },
   { label: "mud", prompt: "mud" },
   { label: "debris", prompt: "debris" },
   { label: "broken window", prompt: "broken window" },
   { label: "mold", prompt: "black spots" },
-] as const;
-type Concept = (typeof DAMAGE_CONCEPTS)[number];
+];
 
 const CONCURRENCY = 6;
 /** Drop specks: SAM splits loose material such as debris into dozens of tiny pieces. */
@@ -37,7 +40,8 @@ export type Detection = {
 
 export type SegmentedFrame = { index: number; timeSec: number; width: number; height: number; detections: Detection[] };
 
-async function segmentOne(frame: Frame, concept: Concept): Promise<Detection[]> {
+async function segmentOne(frame: Frame, concept: Concept, ledger: UsageLedger): Promise<Detection[]> {
+  const started = Date.now();
   const stream = await meta().responses.create({
     model: models.segment,
     stream: true,
@@ -54,6 +58,14 @@ async function segmentOne(frame: Frame, concept: Concept): Promise<Detection[]> 
     ],
   });
   const result = await parseImageStream(stream).finalResult;
+  ledger.add({
+    provider: "meta",
+    model: models.segment,
+    operation: "segment",
+    latencyMs: Date.now() - started,
+    units: { images: 1 },
+    costUsd: UNIT_PRICES.samImage,
+  });
   const { width, height } = frame;
 
   const boxes = new Map(recordsOfKind(result.records, "box").map((b) => [b.objectId, b]));
@@ -91,9 +103,9 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>
   return results;
 }
 
-export async function segmentFrames(frames: Frame[]): Promise<SegmentedFrame[]> {
-  const jobs = frames.flatMap((frame) => DAMAGE_CONCEPTS.map((concept) => ({ frame, concept })));
-  const results = await pool(jobs, CONCURRENCY, ({ frame, concept }) => segmentOne(frame, concept));
+export async function segmentFrames(frames: Frame[], concepts: Concept[], ledger: UsageLedger): Promise<SegmentedFrame[]> {
+  const jobs = frames.flatMap((frame) => concepts.map((concept) => ({ frame, concept })));
+  const results = await pool(jobs, CONCURRENCY, ({ frame, concept }) => segmentOne(frame, concept, ledger));
 
   return frames.map(({ index, timeSec, width, height }) => ({
     index,

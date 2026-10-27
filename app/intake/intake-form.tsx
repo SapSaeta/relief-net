@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { IntakeCase } from "@/lib/intake";
+import type { IntakeCase } from "@/lib/cases";
 
 const COLORS: Record<string, string> = {
   crack: "#e5484d",
