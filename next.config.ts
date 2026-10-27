@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Keep the bundled ffmpeg binary resolvable at runtime.
+  serverExternalPackages: ["ffmpeg-static"],
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

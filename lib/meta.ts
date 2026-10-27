@@ -11,16 +11,27 @@ export const models = {
   voice: process.env.MODEL_VOICE ?? "muse-voice-transcribe-1.0",
 } as const;
 
+const baseURL = process.env.MODEL_API_BASE_URL ?? "https://api.meta.ai/v1";
+
+function apiKey(): string {
+  const key = process.env.MODEL_API_KEY;
+  if (!key) throw new Error("MODEL_API_KEY is not set (see .env.example)");
+  return key;
+}
+
 let client: OpenAI | undefined;
 
 export function meta(): OpenAI {
-  if (!client) {
-    const apiKey = process.env.MODEL_API_KEY;
-    if (!apiKey) throw new Error("MODEL_API_KEY is not set (see .env.example)");
-    client = new OpenAI({
-      apiKey,
-      baseURL: process.env.MODEL_API_BASE_URL ?? "https://api.meta.ai/v1",
-    });
-  }
+  client ??= new OpenAI({ apiKey: apiKey(), baseURL });
   return client;
+}
+
+/** Raw authenticated call for Meta endpoints the openai SDK does not cover (e.g. /asr/transcribe). */
+export async function metaFetch(path: string, init: RequestInit): Promise<Response> {
+  const res = await fetch(`${baseURL}${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${apiKey()}`, ...init.headers },
+  });
+  if (!res.ok) throw new Error(`Meta API ${path} returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  return res;
 }
