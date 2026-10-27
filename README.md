@@ -14,6 +14,7 @@ From a phone video of a damaged home to a prioritized, evidence-backed help requ
 ![Voice](https://img.shields.io/badge/Muse_Voice_Transcribe-1.0-0866FF?style=flat-square&logo=meta&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)
 ![Data](https://img.shields.io/badge/data-100%25_synthetic-2EA44F?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 ![Status](https://img.shields.io/badge/status-day_2_·_verified_help_requests-F2A900?style=flat-square)
 
 </div>
@@ -221,6 +222,7 @@ node scripts/make-fixture.mjs     # synthetic flood walkthrough → private/fixt
 npm run dev                       # http://localhost:3000
 curl localhost:3000/api/health    # {"ok":true,"model":"muse-spark-1.3","reply":"OK",...}
 open http://localhost:3000/intake # upload the walkthrough: help request + damage masks
+npm run typecheck                 # generate Next route types, then tsc
 npm test                          # evidence verification tests
 curl localhost:3000/api/usage     # calls, tokens and estimated cost so far
 ```
@@ -258,6 +260,7 @@ relief-net/
 │   └── make-fixture.mjs         # synthetic test video (Muse Image + say + ffmpeg)
 ├── .env.example                 # environment template (no secrets)
 ├── AGENTS.md                    # Next.js agent notes (maintained by next dev)
+├── LICENSE                      # MIT
 └── CLAUDE.md                    # project rules for the AI coding assistant
 ```
 

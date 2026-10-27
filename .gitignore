@@ -21,6 +21,12 @@ coverage/
 # Heavy or private material (record locally, do not push without thinking)
 /private/
 *.mov
+*.mp4
+*.mp3
+*.wav
+
+# Local Claude Code settings
+.claude/settings.local.json
 
 # Next.js / TypeScript
 /build
