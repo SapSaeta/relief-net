@@ -49,3 +49,9 @@ test("rejects a frame citation without a damage label", () => {
   const [result] = checkEvidence([frame(2, null)], transcript, frames);
   assert.equal(result.verified, false);
 });
+
+test("rejects a quote shorter than three words, even if it appears", () => {
+  const [result] = checkEvidence([quote("one child")], transcript, frames);
+  assert.equal(result.verified, false);
+  assert.match(result.check, /shorter than 3 words/);
+});

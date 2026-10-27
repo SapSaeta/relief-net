@@ -12,13 +12,21 @@ type CheckableFrame = { index: number; detections: { concept: string }[] };
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
-/** A quote must appear verbatim (ignoring case and punctuation) in the transcript; a frame
- *  citation must name a damage label that SAM actually detected in that frame. */
+/** Shorter quotes ("the", "yes") match almost any transcript and prove nothing. */
+export const MIN_QUOTE_WORDS = 3;
+
+/** A quote must be at least MIN_QUOTE_WORDS words and appear verbatim (ignoring case and
+ *  punctuation) in the transcript; a frame citation must name a damage label that SAM actually
+ *  detected in that frame. This proves grounding, not truth: what was said may still be false. */
 export function checkEvidence(items: Evidence[], transcript: { text: string }, frames: CheckableFrame[]): CheckedEvidence[] {
   const spoken = normalize(transcript.text);
   return items.map((e) => {
     if (e.kind === "transcript") {
-      const ok = !!e.quote && normalize(e.quote).length > 0 && spoken.includes(normalize(e.quote));
+      const quote = normalize(e.quote ?? "");
+      if (quote.split(" ").filter(Boolean).length < MIN_QUOTE_WORDS) {
+        return { ...e, verified: false, check: `quote shorter than ${MIN_QUOTE_WORDS} words` };
+      }
+      const ok = spoken.includes(quote);
       return { ...e, verified: ok, check: ok ? "quote found in transcript" : "quote not found in transcript" };
     }
     const frame = frames.find((f) => f.index === e.frame_index);
