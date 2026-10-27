@@ -168,7 +168,7 @@ flowchart TB
 | `muse-voice-transcribe-1.0` | Transcribes the narrated walkthrough |
 | Files API (`purpose: "user_data"`) | Video upload |
 | `muse-image-1.0` | Generates the synthetic test scenes (no real photos are used) |
-| `meta-models/muse-spark-open-1026` on Baseten | Open-weights option for the coordinator side (triage, dedupe, tool-call matching), so sensitive request data can stay on infrastructure the relief organization controls. Verified: tool calling, strict JSON schema, Responses API |
+| `meta-models/muse-spark-open-1026` on Baseten | Open-weights option for the coordinator side (triage, dedupe, tool-call matching), so sensitive request data can stay on infrastructure the relief organization controls. Verified: tool calling, strict JSON schema, Responses API ([results](docs/evidence/open-weights-check.md), `node scripts/check-open-weights.mjs`) |
 
 Only Standard models are used. The `*-contributor` variants are avoided so that data is not used for training.
 
@@ -263,10 +263,12 @@ relief-net/
 │   └── intake.ts                # pipeline orchestration
 ├── docs/
 │   ├── assets/                  # screenshots (synthetic data only)
+│   ├── evidence/                # saved outputs of verification scripts
 │   ├── PLAN.md                  # 10-day build plan
 │   └── RULES.md                 # hackathon rules summary
 ├── scripts/
 │   ├── check-meta-api.mjs       # API key + model access check
+│   ├── check-open-weights.mjs   # Muse Spark Open on Baseten: Responses, tools, strict JSON
 │   └── make-fixture.mjs         # synthetic test video (Muse Image + say + ffmpeg)
 ├── .env.example                 # environment template (no secrets)
 ├── AGENTS.md                    # Next.js agent notes (maintained by next dev)
