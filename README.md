@@ -14,7 +14,7 @@ From a phone video of a damaged home to a prioritized, evidence-backed help requ
 ![Voice](https://img.shields.io/badge/Muse_Voice_Transcribe-1.0-0866FF?style=flat-square&logo=meta&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)
 ![Data](https://img.shields.io/badge/data-100%25_synthetic-2EA44F?style=flat-square)
-![Status](https://img.shields.io/badge/status-day_0_·_template-F2A900?style=flat-square)
+![Status](https://img.shields.io/badge/status-day_1_·_scaffold-F2A900?style=flat-square)
 
 </div>
 
@@ -88,7 +88,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Day | Milestone | Status |
 |---|---|:---:|
 | Oct 26 | Kickoff, API check, repo | ✅ |
-| Oct 27 | Next.js scaffold, video upload, transcription + segmentation pipeline | ⬜ |
+| Oct 27 | Next.js scaffold, video upload, transcription + segmentation pipeline | 🟡 scaffold + Meta client done |
 | Oct 28 | Structured request with per-frame evidence | ⬜ |
 | Oct 29 | Coordinator dashboard: list, dedupe, priority | ⬜ |
 | Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ⬜ |
@@ -128,20 +128,41 @@ gantt
 ## 🚀 Getting started
 
 ```bash
+npm install
 cp .env.example .env              # paste your MODEL_API_KEY into .env (local only)
 node scripts/check-meta-api.mjs   # lists your models and pings muse-spark-1.3
+npm run dev                       # http://localhost:3000
+curl localhost:3000/api/health    # {"ok":true,"model":"muse-spark-1.3","reply":"OK",...}
+```
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant N as Next.js /api/health
+    participant M as Meta Model API
+    B->>N: GET /api/health
+    N->>M: responses.create (muse-spark-1.3), key from server env
+    M-->>N: "OK"
+    N-->>B: { ok, model, reply, latencyMs }
 ```
 
 ## 📁 Repository layout
 
 ```
 relief-net/
+├── app/
+│   ├── api/health/route.ts      # GET: minimal Muse Spark round trip
+│   ├── layout.tsx
+│   └── page.tsx                 # landing page
+├── lib/
+│   └── meta.ts                  # server-only Meta Model API client (Responses API)
 ├── docs/
 │   ├── PLAN.md                  # 10-day build plan
 │   └── RULES.md                 # hackathon rules summary
 ├── scripts/
 │   └── check-meta-api.mjs       # API key + model access check
 ├── .env.example                 # environment template (no secrets)
+├── AGENTS.md                    # Next.js agent notes (maintained by next dev)
 └── CLAUDE.md                    # project rules for the AI coding assistant
 ```
 
