@@ -29,7 +29,7 @@ function openWeights(): OpenAI {
 
 export const isProvider = (value: unknown): value is Provider => PROVIDERS.includes(value as Provider);
 
-/** COORDINATOR_PROVIDER picks the default; open weights keep request data off a closed API. */
+/** COORDINATOR_PROVIDER picks the default: open weights, which an organization can self-host. */
 export function defaultProvider(): Provider {
   const configured = process.env.COORDINATOR_PROVIDER;
   return isProvider(configured) ? configured : "baseten";

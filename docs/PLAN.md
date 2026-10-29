@@ -11,16 +11,17 @@ Own goal: submit before 20:00 Madrid on Nov 4.
 - **Nov 1:** draft report for insurance/aid; full synthetic end-to-end scenario.
 - **Nov 2:** measurement against the manual baseline (15 requests), on both providers (quality, latency, cost).
 - **Nov 3:** polish, Vercel deploy, README, record the 3-min video.
+- **Nov 4:** editing, verified public repo, submit before 20:00 Madrid.
 
-## Deploy decision (taken Oct 27)
+## Deploy decision (taken Oct 27, revised Oct 29)
 
 Vercel functions accept ~4.5 MB request bodies and have no persistent disk, so the live demo uses:
 
 - **Upload:** the browser uploads the video straight to **Vercel Blob** (client upload; the token route is behind the spend guard's access code). `/api/intake` receives only the Blob URL, downloads it to `/tmp`, runs the pipeline and deletes the blob.
-- **Storage:** cases and the usage ledger move from `.data/` to Blob/KV behind the same `saveCase`/`loadCase`/ledger interfaces. The global spend cap must read the persistent ledger **before** the URL is shared; the per-IP limit stays in memory (a speed bump; the cap is the wall).
+- **Blob is for videos only.** Nothing else is stored there.
+- **State in Redis** (Upstash, via the Vercel Marketplace): cases, usage ledger, triage runs, merge decisions and the spend counter, behind one store interface (`lib/store.ts`) whose local implementation is `.data/`. The spend cap uses an atomic counter in that store; the per-IP limit stays in memory (a speed bump; the cap is the wall).
 - **Not chosen:** browser → Meta Files API directly (it would need the API key in the browser; there are no signed upload URLs).
 - **Fallback:** if the deploy slips, the demo video is recorded against the local server; the code path is identical.
-- **Nov 4:** editing, verified public repo, submit before 20:00 Madrid.
 
 ## 3-minute demo
 0:00 problem · 0:20 person records the walkthrough · 1:00 structured request with evidence · 1:40 dashboard: triage of 15 requests, reasoning, human approval · 2:30 metric vs manual · 2:50 close.

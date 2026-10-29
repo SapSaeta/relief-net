@@ -214,7 +214,7 @@ flowchart TB
 | `muse-voice-transcribe-1.0` | Transcribes the narrated walkthrough |
 | Files API (`purpose: "user_data"`) | Video upload |
 | `muse-image-1.0` | Generates the synthetic test scenes (no real photos are used) |
-| `meta-models/muse-spark-open-1026` on Baseten | Default for the coordinator side (triage and dedupe today, tool-call matching next), so sensitive request data can stay on infrastructure the relief organization controls. Verified: tool calling, strict JSON schema, Responses API ([results](docs/evidence/open-weights-check.md), `node scripts/check-open-weights.mjs`) |
+| `meta-models/muse-spark-open-1026` on Baseten | Default for the coordinator side (triage and dedupe today, tool-call matching next), because open weights are a model the relief organization **can self-host**, keeping request data on infrastructure it controls. The demo itself uses Baseten-hosted inference. Verified: tool calling, strict JSON schema, Responses API ([results](docs/evidence/open-weights-check.md), `node scripts/check-open-weights.mjs`) |
 
 Only Standard models are used. The `*-contributor` variants are avoided so that data is not used for training.
 
@@ -254,8 +254,8 @@ gantt
 
 ## 🛡️ Safety by design
 
-- 👤 **Human in the loop:** a coordinator approves every dispatch, and the AI only proposes.
-- 🧾 **Audit log:** every AI suggestion and human decision is recorded.
+- 👤 **Human in the loop** *(designed for; approval of dispatches lands Oct 31)*: the AI only proposes. Today the coordinator already confirms or undoes duplicate merges.
+- 🧾 **Audit log** *(designed for; lands Oct 31)*: every AI suggestion and human decision will be recorded. Today every model call is recorded in the usage ledger.
 - 🚨 **Emergencies go to 112**, and structural risk goes to professionals. relief-net does not give medical or structural advice.
 - 🔐 **Server-side only:** the API key lives in the server environment and never reaches the browser. Upstream error text stays in the server log.
 - 💸 **Spend guard:** every route that calls a paid model needs a demo access code (required in production, fails closed when unset), has a per-IP daily limit, and stops at a global spend cap read from the usage ledger.
