@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { toFile } from "openai";
@@ -30,14 +30,15 @@ async function timed<T>(timings: Record<string, number>, label: string, fn: () =
   }
 }
 
-export async function runIntake(video: File, location?: string): Promise<IntakeCase> {
+/** `writeVideo` puts the uploaded video at the given path (from a multipart file or a blob). */
+export async function runIntake(writeVideo: (path: string) => Promise<void>, location?: string): Promise<IntakeCase> {
   const id = randomUUID();
   const ledger = new UsageLedger(id);
   const work = await mkdtemp(join(tmpdir(), "relief-net-"));
   const timingsMs: Record<string, number> = {};
   try {
     const raw = join(work, "input");
-    await writeFile(raw, Buffer.from(await video.arrayBuffer()));
+    await writeVideo(raw);
 
     const mp4 = join(work, "intake.mp4");
     const wav = join(work, "audio.wav");

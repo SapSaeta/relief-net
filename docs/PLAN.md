@@ -17,7 +17,7 @@ Own goal: submit before 20:00 Madrid on Nov 4.
 
 Vercel functions accept ~4.5 MB request bodies and have no persistent disk, so the live demo uses:
 
-- **Upload:** the browser uploads the video straight to **Vercel Blob** (client upload; the token route is behind the spend guard's access code). `/api/intake` receives only the Blob URL, downloads it to `/tmp`, runs the pipeline and deletes the blob.
+- **Upload (implemented Oct 29):** with `BLOB_READ_WRITE_TOKEN` set, the browser uploads the video straight to a **private** Vercel Blob (client upload; `/api/intake/upload` requires the access code and only issues tokens for MP4/MOV up to 200 MB under `intake/`). `/api/intake` receives only the blob pathname, streams it to `/tmp`, runs the pipeline and deletes the blob. Without the token (local development) the browser posts multipart as before.
 - **Blob is for videos only.** Nothing else is stored there.
 - **State in Redis** (Upstash, via the Vercel Marketplace): cases, usage ledger, triage runs, merge decisions and the spend counter, behind one store interface (`lib/store.ts`) whose local implementation is `.data/`. The spend cap uses an atomic counter in that store; the per-IP limit stays in memory (a speed bump; the cap is the wall).
 - **Not chosen:** browser → Meta Files API directly (it would need the API key in the browser; there are no signed upload URLs).

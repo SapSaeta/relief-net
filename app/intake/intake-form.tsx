@@ -1,5 +1,6 @@
 "use client";
 
+import { upload } from "@vercel/blob/client";
 import { useState } from "react";
 
 import type { IntakeCase } from "@/lib/cases";
@@ -22,15 +23,35 @@ function colorFor(concept: string, proposed: string[]): string {
 
 type State = { status: "idle" } | { status: "running"; startedAt: number } | { status: "done"; intake: IntakeCase } | { status: "error"; message: string };
 
-export function IntakeForm() {
+/** Production uploads the video to Vercel Blob first (request bodies there are capped at ~4.5 MB);
+ *  local development posts it to /api/intake as multipart. */
+async function sendVideo(form: FormData, mode: "blob" | "multipart", accessCode: string): Promise<Response> {
+  form.delete("accessCode");
+  if (mode === "multipart") return fetch("/api/intake", { method: "POST", body: form, headers: { "x-access-code": accessCode } });
+
+  const video = form.get("video") as File;
+  const extension = video.type === "video/quicktime" ? "mov" : "mp4";
+  const blob = await upload(`intake/walkthrough.${extension}`, video, {
+    access: "private",
+    contentType: video.type,
+    handleUploadUrl: "/api/intake/upload",
+    headers: { "x-access-code": accessCode },
+    multipart: video.size > 20 * 1024 * 1024,
+  });
+  return fetch("/api/intake", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-access-code": accessCode },
+    body: JSON.stringify({ blobPathname: blob.pathname, location: form.get("location") }),
+  });
+}
+
+export function IntakeForm({ uploadMode = "multipart" }: { uploadMode?: "blob" | "multipart" }) {
   const [state, setState] = useState<State>({ status: "idle" });
 
   async function submit(form: FormData) {
     setState({ status: "running", startedAt: Date.now() });
     try {
-      const accessCode = String(form.get("accessCode") ?? "");
-      form.delete("accessCode");
-      const res = await fetch("/api/intake", { method: "POST", body: form, headers: { "x-access-code": accessCode } });
+      const res = await sendVideo(form, uploadMode, String(form.get("accessCode") ?? ""));
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
       setState({ status: "done", intake: json });

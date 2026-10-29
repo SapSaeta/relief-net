@@ -1,3 +1,5 @@
+import { blobUploadsEnabled } from "@/lib/blob";
+
 import { IntakeForm, MessageForm } from "./intake-form";
 
 export const metadata = { title: "Intake · relief-net" };
@@ -15,7 +17,7 @@ export default function IntakePage() {
           Life-threatening emergency? Call <strong>112</strong>. Do not enter buildings that may be structurally unsafe.
         </p>
       </header>
-      <IntakeForm />
+      <IntakeForm uploadMode={blobUploadsEnabled() ? "blob" : "multipart"} />
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">No video? Type your request</h2>
         <MessageForm />

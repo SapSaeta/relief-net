@@ -184,6 +184,7 @@ flowchart TB
     end
     subgraph Server["Next.js server (Vercel) · API key never leaves here"]
         R1["/api/intake<br/>/api/intake/message"]
+        R0["/api/intake/upload<br/>Blob client token"]
         R2["/api/triage"]
         LIB["lib/meta.ts<br/>openai SDK · Responses API"]
         LLM["lib/llm.ts<br/>provider switch"]
@@ -201,6 +202,9 @@ flowchart TB
     subgraph Open["Open weights · Baseten"]
         O1[muse-spark-open]
     end
+    UI1 -->|production: video| BLOB[("Vercel Blob<br/>private · videos only<br/>deleted after intake")]
+    UI1 --> R0
+    BLOB --> R1
     UI1 --> R1
     UI2 --> R2
     R1 --> LIB
@@ -301,6 +305,7 @@ relief-net/
 │   ├── api/health/route.ts      # GET: minimal Muse Spark round trip
 │   ├── api/intake/route.ts      # POST video → verified help request
 │   ├── api/intake/message/      # POST typed message → verified help request
+│   ├── api/intake/upload/       # Blob client token for direct video uploads (production)
 │   ├── api/triage/route.ts      # POST: dedupe + prioritize open requests (meta | baseten)
 │   ├── api/triage/merge/        # POST: coordinator confirms or undoes a merge
 │   ├── api/cases/[id]/request/  # re-draft the help request of a stored case
@@ -323,6 +328,7 @@ relief-net/
 │   ├── triage-rules.ts          # verified duplicates, safety tiers (+ triage-rules.test.ts)
 │   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger + spend counter
 │   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap
+│   ├── blob.ts                  # private video blobs: download to /tmp, then delete
 │   ├── store/                   # store interface: filesystem (.data/) or Redis (+ store.test.ts)
 │   ├── cases.ts                 # cases in the store
 │   └── intake.ts                # pipeline orchestration (video and typed message)
