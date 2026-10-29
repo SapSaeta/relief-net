@@ -1,5 +1,5 @@
 import { loadCase, saveCase } from "@/lib/cases";
-import { COST_ESTIMATE_USD, guardPaidCall } from "@/lib/guard";
+import { COST_ESTIMATE_USD, withPaidCall } from "@/lib/guard";
 import { draftHelpRequest } from "@/lib/request";
 import { UsageLedger } from "@/lib/usage";
 
@@ -8,9 +8,10 @@ import { UsageLedger } from "@/lib/usage";
 export const maxDuration = 120;
 
 export async function POST(request: Request, ctx: RouteContext<"/api/cases/[id]/request">) {
-  const denied = await guardPaidCall(request, COST_ESTIMATE_USD.request);
-  if (denied) return denied;
+  return withPaidCall(request, COST_ESTIMATE_USD.request, () => redraft(ctx));
+}
 
+async function redraft(ctx: RouteContext<"/api/cases/[id]/request">) {
   const { id } = await ctx.params;
   const intake = await loadCase(id);
   if (!intake) return Response.json({ error: "Case not found" }, { status: 404 });

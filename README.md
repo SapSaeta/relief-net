@@ -181,7 +181,7 @@ flowchart TB
         LLM["lib/llm.ts<br/>provider switch"]
         RULES["lib/triage-rules.ts<br/>verified duplicates · safety tiers"]
         VER["lib/evidence.ts<br/>verifies citations"]
-        LED[("Usage ledger<br/>tokens · latency · cost")]
+        LED[("lib/store.ts<br/>cases · usage ledger · triage · spend counters<br/>.data/ locally · Redis in production")]
         LOG[(Audit log)]
     end
     subgraph Meta["Meta Model API"]
@@ -258,13 +258,13 @@ gantt
 - 🧾 **Audit log** *(designed for; lands Oct 31)*: every AI suggestion and human decision will be recorded. Today every model call is recorded in the usage ledger.
 - 🚨 **Emergencies go to 112**, and structural risk goes to professionals. relief-net does not give medical or structural advice.
 - 🔐 **Server-side only:** the API key lives in the server environment and never reaches the browser. Upstream error text stays in the server log.
-- 💸 **Spend guard:** every route that calls a paid model needs a demo access code (required in production, fails closed when unset), has a per-IP daily limit, and stops at a global spend cap read from the usage ledger.
+- 💸 **Spend guard:** every route that calls a paid model needs a demo access code (required in production, fails closed when unset), has a per-IP daily limit, and stops at a global spend cap: each call atomically reserves its worst-case cost in the persistent store, and the ledger adds the actual cost to an atomic counter.
 
 | Guard | Setting | Response when hit |
 |---|---|---|
 | Access code (`x-access-code` header) | `DEMO_ACCESS_CODE` | 401 |
 | Calls per IP per day | `MAX_CALLS_PER_IP_PER_DAY` (20) | 429 |
-| Total spend incl. the call's worst case | `SPEND_CAP_USD` (25) | 503 |
+| Spent + open reservations (atomic counters) | `SPEND_CAP_USD` (25) | 503 |
 - 🧪 **Synthetic data only:** no real people, companies or clients.
 
 ## 🚀 Getting started
@@ -281,7 +281,7 @@ open http://localhost:3000/intake # upload the walkthrough or type a message: he
 node scripts/seed-scenario.mjs    # 14 synthetic messages of the Riverside flood (≈ $0.20)
 open http://localhost:3000/coordinator # run triage on Meta or open weights
 npm run typecheck                 # generate Next route types, then tsc
-npm test                          # evidence and triage-rule tests
+npm test                          # evidence, triage-rule and store tests
 curl localhost:3000/api/usage     # calls, tokens and estimated cost so far
 ```
 
@@ -312,9 +312,10 @@ relief-net/
 │   ├── llm.ts                   # provider switch: Meta API ↔ Muse Spark Open on Baseten
 │   ├── triage.ts                # coordinator triage call + stored run
 │   ├── triage-rules.ts          # verified duplicates, safety tiers (+ triage-rules.test.ts)
-│   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger
+│   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger + spend counter
 │   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap
-│   ├── cases.ts                 # local case store (.data/cases)
+│   ├── store/                   # store interface: filesystem (.data/) or Redis (+ store.test.ts)
+│   ├── cases.ts                 # cases in the store
 │   └── intake.ts                # pipeline orchestration (video and typed message)
 ├── docs/
 │   ├── assets/                  # screenshots (synthetic data only)

@@ -1,15 +1,16 @@
 import "server-only";
 
-import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { tokenCostUsd } from "@/lib/pricing";
+import { store } from "@/lib/store";
 
 // Usage ledger: tokens or units, latency and estimated cost of every model call.
-// Kept per case and appended to .data/usage.jsonl (git-ignored) for running totals.
+// Kept per case, appended to the store's "usage" log (.data/usage.jsonl locally) for running
+// totals, and added to the atomic spend counter the spend guard reads.
 
-const DATA_DIR = join(process.cwd(), ".data");
-const LEDGER_FILE = join(DATA_DIR, "usage.jsonl");
+const USAGE_LOG = "usage";
+/** Spend counters are integers in micro-USD so they can use atomic INCRBY. */
+export const SPENT_COUNTER = "spend-spent-micro-usd";
+export const toMicroUsd = (usd: number) => Math.round(usd * 1_000_000);
 
 export type Provider = "meta" | "baseten";
 
@@ -38,6 +39,7 @@ type ResponsesUsage = {
 
 export class UsageLedger {
   readonly entries: UsageEntry[] = [];
+  private flushed = 0;
 
   constructor(private readonly caseId?: string) {}
 
@@ -69,10 +71,13 @@ export class UsageLedger {
     return this.entries.reduce((sum, e) => sum + e.costUsd, 0);
   }
 
+  /** Persists entries recorded since the last flush; safe to call more than once. */
   async flush(): Promise<void> {
-    if (!this.entries.length) return;
-    await mkdir(DATA_DIR, { recursive: true });
-    await appendFile(LEDGER_FILE, this.entries.map((e) => JSON.stringify(e)).join("\n") + "\n");
+    const pending = this.entries.slice(this.flushed);
+    if (!pending.length) return;
+    this.flushed = this.entries.length;
+    await store().append(USAGE_LOG, pending);
+    await store().incrBy(SPENT_COUNTER, toMicroUsd(pending.reduce((sum, e) => sum + e.costUsd, 0)));
   }
 }
 
@@ -84,15 +89,9 @@ export type UsageSummary = {
 };
 
 export async function summarizeUsage(): Promise<UsageSummary> {
-  let lines: string[] = [];
-  try {
-    lines = (await readFile(LEDGER_FILE, "utf8")).split("\n").filter(Boolean);
-  } catch {
-    // No usage recorded yet.
-  }
+  const entries = await store().readLog<UsageEntry>(USAGE_LOG);
   const summary: UsageSummary = { calls: 0, costUsd: 0, byProvider: {}, byOperation: {} };
-  for (const line of lines) {
-    const e = JSON.parse(line) as UsageEntry;
+  for (const e of entries) {
     summary.calls++;
     summary.costUsd += e.costUsd;
     const p = (summary.byProvider[e.provider] ??= { calls: 0, costUsd: 0 });

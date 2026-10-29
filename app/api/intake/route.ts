@@ -1,4 +1,4 @@
-import { COST_ESTIMATE_USD, guardPaidCall } from "@/lib/guard";
+import { COST_ESTIMATE_USD, withPaidCall } from "@/lib/guard";
 import { runIntake } from "@/lib/intake";
 
 // POST multipart/form-data with a `video` field (MP4 or MOV) and an optional `location`.
@@ -10,9 +10,10 @@ const MAX_BYTES = 200 * 1024 * 1024;
 const ACCEPTED = new Set(["video/mp4", "video/quicktime"]);
 
 export async function POST(request: Request) {
-  const denied = await guardPaidCall(request, COST_ESTIMATE_USD.intake);
-  if (denied) return denied;
+  return withPaidCall(request, COST_ESTIMATE_USD.intake, () => intake(request));
+}
 
+async function intake(request: Request) {
   const form = await request.formData();
   const video = form.get("video");
 

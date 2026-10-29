@@ -1,4 +1,4 @@
-import { COST_ESTIMATE_USD, guardPaidCall } from "@/lib/guard";
+import { COST_ESTIMATE_USD, withPaidCall } from "@/lib/guard";
 import { runMessageIntake } from "@/lib/intake";
 
 // POST JSON { message, location?, receivedAt? }: a help request typed instead of filmed.
@@ -8,9 +8,10 @@ export const maxDuration = 120;
 const MAX_CHARS = 2000;
 
 export async function POST(request: Request) {
-  const denied = await guardPaidCall(request, COST_ESTIMATE_USD.message);
-  if (denied) return denied;
+  return withPaidCall(request, COST_ESTIMATE_USD.message, () => intake(request));
+}
 
+async function intake(request: Request) {
   const body = (await request.json().catch(() => null)) as { message?: unknown; location?: unknown; receivedAt?: unknown } | null;
   const message = typeof body?.message === "string" ? body.message.trim() : "";
   if (message.split(/\s+/).length < 3) return Response.json({ error: "Describe the situation in a few words" }, { status: 400 });

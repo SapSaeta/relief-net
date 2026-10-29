@@ -1,18 +1,18 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 
 import { listCases, type IntakeCase } from "@/lib/cases";
 import { llm, type Llm } from "@/lib/llm";
+import { store } from "@/lib/store";
 import { applyTriageRules, type DuplicateGroup, type ModelTriage, type QueueItem, type TriageInput } from "@/lib/triage-rules";
 import { UsageLedger, type Provider } from "@/lib/usage";
 
 // Coordinator triage: one model call over every open request proposes duplicates and an
 // order with reasons; lib/triage-rules.ts decides what is accepted. Runs on either provider.
 
-const TRIAGE_FILE = join(process.cwd(), ".data", "triage.json");
+const TRIAGE = "triage";
+const LATEST = "latest";
 const MAX_WORDS_CHARS = 700;
 
 const TRIAGE_SCHEMA = {
@@ -147,8 +147,7 @@ export async function runTriage(provider?: Provider): Promise<TriageRun> {
       caseIds: open.map((c) => c.id),
       ...applyTriageRules(inputs, proposal),
     };
-    await mkdir(join(process.cwd(), ".data"), { recursive: true });
-    await writeFile(TRIAGE_FILE, JSON.stringify(run));
+    await store().putDoc(TRIAGE, LATEST, run);
     return run;
   } finally {
     await ledger.flush();
@@ -156,9 +155,5 @@ export async function runTriage(provider?: Provider): Promise<TriageRun> {
 }
 
 export async function loadTriage(): Promise<TriageRun | null> {
-  try {
-    return JSON.parse(await readFile(TRIAGE_FILE, "utf8")) as TriageRun;
-  } catch {
-    return null;
-  }
+  return store().getDoc<TriageRun>(TRIAGE, LATEST);
 }

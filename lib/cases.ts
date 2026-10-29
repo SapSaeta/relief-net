@@ -1,17 +1,15 @@
 import "server-only";
 
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import type { HelpRequest } from "@/lib/request";
 import type { GroundedProposal } from "@/lib/scout";
 import type { SegmentedFrame } from "@/lib/segment";
 import type { Transcript } from "@/lib/transcribe";
+import { store } from "@/lib/store";
 import type { UsageEntry } from "@/lib/usage";
 
-// Local case store: one JSON file per case under .data/cases (git-ignored).
+// Cases live in the store (lib/store): .data/cases locally, Redis in production.
 
-const CASES_DIR = join(process.cwd(), ".data", "cases");
+const CASES = "cases";
 
 export type IntakeCase = {
   id: string;
@@ -37,27 +35,16 @@ export type IntakeCase = {
 const isCaseId = (id: string) => /^[0-9a-f-]{36}$/.test(id);
 
 export async function saveCase(intake: IntakeCase): Promise<void> {
-  await mkdir(CASES_DIR, { recursive: true });
-  await writeFile(join(CASES_DIR, `${intake.id}.json`), JSON.stringify(intake));
+  await store().putDoc(CASES, intake.id, intake);
 }
 
 export async function loadCase(id: string): Promise<IntakeCase | null> {
   if (!isCaseId(id)) return null;
-  try {
-    return JSON.parse(await readFile(join(CASES_DIR, `${id}.json`), "utf8")) as IntakeCase;
-  } catch {
-    return null;
-  }
+  return store().getDoc<IntakeCase>(CASES, id);
 }
 
 /** All stored cases, newest first. */
 export async function listCases(): Promise<IntakeCase[]> {
-  let names: string[] = [];
-  try {
-    names = (await readdir(CASES_DIR)).filter((n) => n.endsWith(".json"));
-  } catch {
-    return [];
-  }
-  const cases = await Promise.all(names.map((n) => loadCase(n.slice(0, -".json".length))));
-  return cases.filter((c): c is IntakeCase => c !== null).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const cases = await store().listDocs<IntakeCase>(CASES);
+  return cases.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

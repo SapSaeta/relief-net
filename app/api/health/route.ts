@@ -1,16 +1,17 @@
 import { connection } from "next/server";
 import OpenAI from "openai";
 
-import { COST_ESTIMATE_USD, guardPaidCall } from "@/lib/guard";
+import { COST_ESTIMATE_USD, withPaidCall } from "@/lib/guard";
 import { meta, models } from "@/lib/meta";
 import { UsageLedger } from "@/lib/usage";
 
 // Minimal round trip to Muse Spark. Never cached, never exposes the key.
 export async function GET(request: Request) {
   await connection();
-  const denied = await guardPaidCall(request, COST_ESTIMATE_USD.health);
-  if (denied) return denied;
+  return withPaidCall(request, COST_ESTIMATE_USD.health, ping);
+}
 
+async function ping() {
   const started = Date.now();
   const ledger = new UsageLedger();
   try {
