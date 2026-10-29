@@ -15,7 +15,7 @@ From a phone video of a damaged home to a prioritized, evidence-backed help requ
 ![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)
 ![Data](https://img.shields.io/badge/data-100%25_synthetic-2EA44F?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
-![Status](https://img.shields.io/badge/status-day_2_·_verified_help_requests-F2A900?style=flat-square)
+![Status](https://img.shields.io/badge/status-day_3_·_coordinator_triage-F2A900?style=flat-square)
 
 </div>
 
@@ -36,11 +36,12 @@ flowchart LR
     P --> E["🎯 SAM 3.1<br/>where the damage is"]
     P --> S["🧠 Muse Spark scout<br/>what else to look for"] --> E
     A --> B["☁️ Files API<br/>video upload"]
+    T["💬 Typed message<br/>(no video)"] --> F
     C --> F["🧠 Muse Spark<br/>structured help request<br/>+ evidence per frame"]
     E --> F
     B --> F
     F --> V["🔍 Code verifies<br/>every citation"] --> G
-    G["📋 Coordinator dashboard<br/>dedupe · prioritize · match"]
+    G["📋 Coordinator triage<br/>Muse Spark (Meta or open weights)<br/>dedupe · prioritize<br/>code checks quotes + safety tiers"]
     G --> H{"👤 Human<br/>approves?"}
     H -- yes --> I["🚚 Dispatch volunteers<br/>& resources"]
     H -- no --> G
@@ -123,6 +124,48 @@ On the test walkthrough Spark proposed 4 items; SAM located 2 (overturned chair,
 
 Every model call is recorded with tokens or units, latency and cost (`.data/usage.jsonl`); `GET /api/usage` returns running totals.
 
+## 📋 Coordinator triage (working)
+
+![Coordinator dashboard: 15 requests triaged, 112 first, duplicates merged with verified quotes](docs/assets/coordinator-triage.jpg)
+
+<sub>Synthetic “Riverside flood” scenario (`fixtures/riverside-flood.json`): the video walkthrough plus 14 typed messages, all fictional.</sub>
+
+One model call over every open request proposes **duplicates** and a **queue with a reason per request**. Code then decides what is accepted:
+
+```mermaid
+flowchart LR
+    C["📥 15 open requests<br/>summary · flags · own words"] --> M["🧠 Muse Spark<br/>Meta API or Baseten"]
+    M -->|duplicate groups + quotes| D{"🔍 every member backed<br/>by a verified quote<br/>from its own words?"}
+    D -- yes --> MERGE["🔗 merged; kept request<br/>inherits the most urgent tier"]
+    D -- no --> SHOW["⚠️ shown as possible,<br/>not merged"]
+    M -->|order + reasons| T["🚦 stable sort by safety tier<br/>112 › critical › high › medium › low"]
+    MERGE --> T
+    T --> Q["📋 queue for the human<br/>↑ marks rule overrides"]
+```
+
+| Check in `lib/triage-rules.ts` | Why |
+|---|---|
+| Duplicate quotes (3+ words) must appear in each member's own words | the model cannot merge two households on a hunch |
+| A case can sit in only one group; unknown refs are dropped | malformed output cannot hide a request |
+| Queue is re-sorted by safety tier, keeping the model's order within a tier | a 112 case is never below a garden fence, whatever the model says |
+| Requests the model leaves out are appended, never lost | nobody disappears from the queue |
+
+The words of each request are passed as delimited, untrusted data. Unit tests (`npm test`) cover merging, invented quotes, overlapping groups, tier overrides and missing items.
+
+### ⚖️ Same triage, both providers (measured)
+
+| | Muse Spark 1.3 · Meta API | Muse Spark Open · Baseten |
+|---|---:|---:|
+| Duplicates found (2 expected) | ✅ 2/2, both verified | ✅ 2/2, both verified |
+| Traps kept apart (9 vs 11 Church St, 4 vs 5 Mill Lane) | ✅ | ✅ |
+| 112 case first · injection attempt last | ✅ · ✅ | ✅ · ✅ |
+| Safety-rule overrides needed | 0 | 0 |
+| Latency | 14.3 s | 17.5 s |
+| Tokens in / out | 2,628 / 3,765 | 2,519 / 4,441 |
+| Cost | $0.019 | $0.022 |
+
+One run each on 15 requests; the full comparison with repeated runs and a manual baseline is planned for Nov 2.
+
 ## 🧩 Architecture
 
 ```mermaid
@@ -132,9 +175,11 @@ flowchart TB
         UI2[Coordinator dashboard]
     end
     subgraph Server["Next.js server (Vercel) · API key never leaves here"]
-        R1["/api/intake"]
+        R1["/api/intake<br/>/api/intake/message"]
         R2["/api/triage"]
         LIB["lib/meta.ts<br/>openai SDK · Responses API"]
+        LLM["lib/llm.ts<br/>provider switch"]
+        RULES["lib/triage-rules.ts<br/>verified duplicates · safety tiers"]
         VER["lib/evidence.ts<br/>verifies citations"]
         LED[("Usage ledger<br/>tokens · latency · cost")]
         LOG[(Audit log)]
@@ -151,9 +196,10 @@ flowchart TB
     UI1 --> R1
     UI2 --> R2
     R1 --> LIB
-    R2 --> LIB
+    R2 --> LLM --> RULES
     LIB --> M1 & M2 & M3 & M4
-    R2 -.->|provider switch| O1
+    LLM -->|meta| M4
+    LLM -->|baseten| O1
     R1 --> VER
     LIB --> LED
     R1 & R2 --> LOG
@@ -163,12 +209,12 @@ flowchart TB
 
 | Model | Role in relief-net |
 |---|---|
-| `muse-spark-1.3` | Structured help request (strict JSON schema, video input), scout that proposes what SAM should look for; next: deduplication, prioritization, tool calls to match volunteers/resources, draft insurance/aid report |
+| `muse-spark-1.3` | Structured help request (strict JSON schema, video or typed message), scout that proposes what SAM should look for, coordinator triage (deduplication + prioritization); next: tool calls to match volunteers/resources, draft insurance/aid report |
 | `sam-3.1` | Segments visible damage on key frames as evidence, including damage proposed by Spark |
 | `muse-voice-transcribe-1.0` | Transcribes the narrated walkthrough |
 | Files API (`purpose: "user_data"`) | Video upload |
 | `muse-image-1.0` | Generates the synthetic test scenes (no real photos are used) |
-| `meta-models/muse-spark-open-1026` on Baseten | Open-weights option for the coordinator side (triage, dedupe, tool-call matching), so sensitive request data can stay on infrastructure the relief organization controls. Verified: tool calling, strict JSON schema, Responses API ([results](docs/evidence/open-weights-check.md), `node scripts/check-open-weights.mjs`) |
+| `meta-models/muse-spark-open-1026` on Baseten | Default for the coordinator side (triage and dedupe today, tool-call matching next), so sensitive request data can stay on infrastructure the relief organization controls. Verified: tool calling, strict JSON schema, Responses API ([results](docs/evidence/open-weights-check.md), `node scripts/check-open-weights.mjs`) |
 
 Only Standard models are used. The `*-contributor` variants are avoided so that data is not used for training.
 
@@ -179,7 +225,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 26 | Kickoff, API check, repo | ✅ |
 | Oct 27 | Next.js scaffold, video upload, transcription + segmentation pipeline | ✅ |
 | Oct 28 | Structured request with per-frame evidence · evidence verification · agentic grounding · cost ledger | ✅ |
-| Oct 29 | Coordinator dashboard: list, dedupe, priority · provider switch Meta ↔ open weights (Baseten) | ⬜ |
+| Oct 29 | Coordinator dashboard: list, dedupe, priority · provider switch Meta ↔ open weights (Baseten) · typed-message intake · 15-request synthetic scenario | ✅ |
 | Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ⬜ |
 | Oct 31 | Human approval, audit log, safety rules | ⬜ |
 | Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ⬜ |
@@ -228,11 +274,14 @@ npm install
 cp .env.example .env              # paste your MODEL_API_KEY into .env (local only)
 node scripts/check-meta-api.mjs   # lists your models and pings muse-spark-1.3
 node scripts/make-fixture.mjs     # synthetic flood walkthrough → private/fixtures/intake-flood.mp4 (macOS)
+node scripts/check-open-weights.mjs # optional: Muse Spark Open on Baseten (needs OPEN_WEIGHTS_API_KEY)
 npm run dev                       # http://localhost:3000
 curl localhost:3000/api/health    # {"ok":true,"model":"muse-spark-1.3","reply":"OK",...}
-open http://localhost:3000/intake # upload the walkthrough: help request + damage masks
+open http://localhost:3000/intake # upload the walkthrough or type a message: help request + damage masks
+node scripts/seed-scenario.mjs    # 14 synthetic messages of the Riverside flood (≈ $0.20)
+open http://localhost:3000/coordinator # run triage on Meta or open weights
 npm run typecheck                 # generate Next route types, then tsc
-npm test                          # evidence verification tests
+npm test                          # evidence and triage-rule tests
 curl localhost:3000/api/usage     # calls, tokens and estimated cost so far
 ```
 
@@ -243,9 +292,12 @@ relief-net/
 ├── app/
 │   ├── api/health/route.ts      # GET: minimal Muse Spark round trip
 │   ├── api/intake/route.ts      # POST video → verified help request
+│   ├── api/intake/message/      # POST typed message → verified help request
+│   ├── api/triage/route.ts      # POST: dedupe + prioritize open requests (meta | baseten)
 │   ├── api/cases/[id]/request/  # re-draft the help request of a stored case
 │   ├── api/usage/route.ts       # GET running usage and cost totals
 │   ├── cases/[id]/page.tsx      # view a stored case
+│   ├── coordinator/             # triage queue, merged duplicates, provider switch
 │   ├── intake/                  # intake page: upload, help request card, mask overlays
 │   ├── layout.tsx
 │   └── page.tsx                 # landing page
@@ -257,18 +309,24 @@ relief-net/
 │   ├── scout.ts                 # Muse Spark proposes extra damage for SAM to ground
 │   ├── request.ts               # Muse Spark structured help request (strict JSON schema)
 │   ├── evidence.ts              # deterministic evidence checks (+ evidence.test.ts)
+│   ├── llm.ts                   # provider switch: Meta API ↔ Muse Spark Open on Baseten
+│   ├── triage.ts                # coordinator triage call + stored run
+│   ├── triage-rules.ts          # verified duplicates, safety tiers (+ triage-rules.test.ts)
 │   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger
 │   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap
 │   ├── cases.ts                 # local case store (.data/cases)
-│   └── intake.ts                # pipeline orchestration
+│   └── intake.ts                # pipeline orchestration (video and typed message)
 ├── docs/
 │   ├── assets/                  # screenshots (synthetic data only)
 │   ├── evidence/                # saved outputs of verification scripts
 │   ├── PLAN.md                  # 10-day build plan
 │   └── RULES.md                 # hackathon rules summary
+├── fixtures/
+│   └── riverside-flood.json     # synthetic 15-request scenario + expected triage
 ├── scripts/
 │   ├── check-meta-api.mjs       # API key + model access check
 │   ├── check-open-weights.mjs   # Muse Spark Open on Baseten: Responses, tools, strict JSON
+│   ├── seed-scenario.mjs        # posts the synthetic scenario to a running server
 │   └── make-fixture.mjs         # synthetic test video (Muse Image + say + ffmpeg)
 ├── .env.example                 # environment template (no secrets)
 ├── AGENTS.md                    # Next.js agent notes (maintained by next dev)
