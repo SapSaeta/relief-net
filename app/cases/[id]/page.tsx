@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { IntakeResult } from "@/app/intake/intake-form";
+import { ReviewBanner } from "@/app/review-banner";
 import { loadCase } from "@/lib/cases";
 
 export const metadata = { title: "Case · relief-net" };
@@ -11,6 +12,7 @@ export default function CasePage({ params }: PageProps<"/cases/[id]">) {
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-12">
       <h1 className="text-3xl font-semibold tracking-tight">Case</h1>
+      <ReviewBanner />
       <Suspense fallback={<p className="text-sm text-foreground/60">Loading case…</p>}>
         <CaseView params={params} />
       </Suspense>

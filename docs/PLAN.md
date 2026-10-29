@@ -21,6 +21,7 @@ Vercel functions accept ~4.5 MB request bodies and have no persistent disk, so t
 - **Blob is for videos only.** Nothing else is stored there.
 - **State in Redis** (Upstash, via the Vercel Marketplace): cases, usage ledger, triage runs, merge decisions and the spend counter, behind one store interface (`lib/store.ts`) whose local implementation is `.data/`. The spend cap uses an atomic counter in that store; the per-IP limit stays in memory (a speed bump; the cap is the wall).
 - **Not chosen:** browser → Meta Files API directly (it would need the API key in the browser; there are no signed upload URLs).
+- **Review mode for judges:** pages are readable without a code and show a pre-seeded synthetic scenario (`scripts/publish-snapshot.mjs` copies it to Redis); intake, triage and merge decisions need `DEMO_ACCESS_CODE`, given privately in the submission's testing instructions.
 - **Fallback:** if the deploy slips, the demo video is recorded against the local server; the code path is identical.
 
 ## 3-minute demo

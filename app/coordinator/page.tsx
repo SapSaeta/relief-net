@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { Badge } from "@/app/intake/help-request-card";
+import { ReviewBanner } from "@/app/review-banner";
 import { listCases, type IntakeCase } from "@/lib/cases";
 import { defaultProvider, openWeightsConfigured, PROVIDER_LABELS } from "@/lib/llm";
 import { loadTriage, type TriageRun } from "@/lib/triage";
@@ -24,6 +25,7 @@ export default function CoordinatorPage() {
           critical, high, medium, low. You decide what happens next.
         </p>
       </header>
+      <ReviewBanner />
       <Suspense fallback={<p className="text-sm text-foreground/60">Loading requests…</p>}>
         <Dashboard />
       </Suspense>

@@ -264,6 +264,18 @@ gantt
     Submit                         :milestone, 2026-11-04, 0d
 ```
 
+## 🧑‍⚖️ For judges: review mode
+
+The live demo opens in **review mode**: a pre-seeded, fully synthetic scenario (the Riverside flood: 1 video walkthrough + 14 typed messages) that anyone can read, while everything that costs money or changes a decision needs the demo access code.
+
+| Without the code (anyone with the URL) | With the code |
+|---|---|
+| `/coordinator`: triage queue, reasons, duplicates, safety-rule overrides | Run triage on Meta or open weights |
+| `/cases/[id]`: help request, evidence chips, SAM masks, transcript | Confirm or undo a merge |
+| `/api/usage`: running cost | Submit a video or typed message on `/intake` |
+
+**How judges get the code:** it is given privately in the hackathon submission's testing-instructions field, never in this repository, the video or a screenshot. It is a random demo-only value (`DEMO_ACCESS_CODE`), rotated after judging, and the spend cap (`SPEND_CAP_USD`) bounds what any code holder can spend.
+
 ## 🛡️ Safety by design
 
 - 👤 **Human in the loop** *(designed for; approval of dispatches lands Oct 31)*: the AI only proposes. Today the coordinator already confirms or undoes duplicate merges.
@@ -297,6 +309,18 @@ npm test                          # evidence, triage-rule and store tests
 curl localhost:3000/api/usage     # calls, tokens and estimated cost so far
 ```
 
+### ☁️ Deploy (Vercel)
+
+1. Add the **Upstash for Redis** integration from the Vercel Marketplace (sets `KV_REST_API_URL`, `KV_REST_API_TOKEN`) and create a **private Blob store** (sets `BLOB_READ_WRITE_TOKEN`).
+2. Set `MODEL_API_KEY`, `OPEN_WEIGHTS_API_KEY`, `DEMO_ACCESS_CODE` and `SPEND_CAP_USD` in the project's environment variables.
+3. Publish the local synthetic scenario for review mode:
+
+```bash
+vercel env pull .env.production.local          # git-ignored; never commit or print it
+node --env-file=.env.production.local scripts/publish-snapshot.mjs          # dry run
+node --env-file=.env.production.local scripts/publish-snapshot.mjs --write  # copy cases, triage, decisions, usage
+```
+
 ## 📁 Repository layout
 
 ```
@@ -312,6 +336,7 @@ relief-net/
 │   ├── api/usage/route.ts       # GET running usage and cost totals
 │   ├── cases/[id]/page.tsx      # view a stored case
 │   ├── coordinator/             # triage queue, merged duplicates, provider switch
+│   ├── review-banner.tsx        # review mode notice (read open, actions need the code)
 │   ├── intake/                  # intake page: upload, help request card, mask overlays
 │   ├── layout.tsx
 │   └── page.tsx                 # landing page
@@ -344,6 +369,7 @@ relief-net/
 │   ├── check-open-weights.mjs   # Muse Spark Open on Baseten: Responses, tools, strict JSON
 │   ├── seed-scenario.mjs        # posts the synthetic scenario to a running server
 │   ├── eval-injection.mjs       # repeats triage per provider; injection pass rate + latency
+│   ├── publish-snapshot.mjs     # copies the local synthetic scenario to production Redis
 │   └── make-fixture.mjs         # synthetic test video (Muse Image + say + ffmpeg)
 ├── .env.example                 # environment template (no secrets)
 ├── AGENTS.md                    # Next.js agent notes (maintained by next dev)
