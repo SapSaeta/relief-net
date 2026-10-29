@@ -15,7 +15,7 @@ const MAX_CALLS_PER_IP_PER_DAY = Number(process.env.MAX_CALLS_PER_IP_PER_DAY ?? 
 const DAY_MS = 24 * 3600 * 1000;
 
 /** Worst-case cost of one call per route, so the cap holds before the call is made. */
-export const COST_ESTIMATE_USD = { intake: 0.3, request: 0.06, health: 0.01 } as const;
+export const COST_ESTIMATE_USD = { intake: 0.3, message: 0.06, request: 0.06, triage: 0.15, health: 0.01 } as const;
 
 const callsByIp = new Map<string, number[]>();
 

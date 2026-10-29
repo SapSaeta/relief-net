@@ -1,7 +1,7 @@
 import { COST_ESTIMATE_USD, guardPaidCall } from "@/lib/guard";
 import { runIntake } from "@/lib/intake";
 
-// POST multipart/form-data with a `video` field (MP4 or MOV).
+// POST multipart/form-data with a `video` field (MP4 or MOV) and an optional `location`.
 // Runs upload, transcription and damage segmentation; returns the stored case.
 
 export const maxDuration = 300;
@@ -27,7 +27,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    return Response.json(await runIntake(video));
+    const location = String(form.get("location") ?? "").trim().slice(0, 200) || undefined;
+    return Response.json(await runIntake(video, location));
   } catch (error) {
     console.error("intake failed", error);
     // Upstream error text stays in the server log.

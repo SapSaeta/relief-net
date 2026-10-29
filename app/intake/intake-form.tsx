@@ -51,6 +51,11 @@ export function IntakeForm() {
           className="flex-1 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-foreground/10 file:px-3 file:py-2"
         />
         <input
+          name="location"
+          placeholder="Address or area"
+          className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm sm:w-48"
+        />
+        <input
           name="accessCode"
           type="password"
           placeholder="Demo access code"
@@ -75,6 +80,63 @@ export function IntakeForm() {
   );
 }
 
+type MessageState = { status: "idle" } | { status: "running" } | { status: "done"; intake: IntakeCase } | { status: "error"; message: string };
+
+/** No video (no data, no battery, can't film): the same help request from a typed message. */
+export function MessageForm() {
+  const [state, setState] = useState<MessageState>({ status: "idle" });
+
+  async function submit(form: FormData) {
+    setState({ status: "running" });
+    try {
+      const res = await fetch("/api/intake/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-access-code": String(form.get("accessCode") ?? "") },
+        body: JSON.stringify({ message: form.get("message"), location: form.get("location") }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
+      setState({ status: "done", intake: json });
+    } catch (error) {
+      setState({ status: "error", message: error instanceof Error ? error.message : "Sending failed" });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <form action={submit} className="flex flex-col gap-3 rounded-xl border border-foreground/15 p-5">
+        <textarea
+          name="message"
+          required
+          rows={3}
+          maxLength={2000}
+          placeholder="What happened, who lives there and what help you need"
+          className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm"
+        />
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <input name="location" placeholder="Address or area" className="flex-1 rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm" />
+          <input
+            name="accessCode"
+            type="password"
+            placeholder="Demo access code"
+            autoComplete="off"
+            className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm sm:w-44"
+          />
+          <button
+            type="submit"
+            disabled={state.status === "running"}
+            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+          >
+            {state.status === "running" ? "Sending…" : "Send message"}
+          </button>
+        </div>
+      </form>
+      {state.status === "error" && <p className="text-sm text-red-600">{state.message}</p>}
+      {state.status === "done" && <IntakeResult intake={state.intake} />}
+    </div>
+  );
+}
+
 export function IntakeResult({ intake }: { intake: IntakeCase }) {
   const proposed = (intake.proposals ?? []).map((p) => p.label);
   const color = (concept: string) => colorFor(concept, proposed);
@@ -91,7 +153,8 @@ export function IntakeResult({ intake }: { intake: IntakeCase }) {
           </span>
         ))}
         <span className="ml-auto text-foreground/50">
-          {intake.durationSec.toFixed(1)} s video · ${intake.costUsd.toFixed(3)} · {intake.usage.length} model calls ·{" "}
+          {intake.location ? `📍 ${intake.location} · ` : ""}
+          {intake.source === "message" ? "typed message" : `${intake.durationSec.toFixed(1)} s video`} · ${intake.costUsd.toFixed(3)} · {intake.usage.length} model calls ·{" "}
           {Object.entries(intake.timingsMs)
             .map(([k, v]) => `${k} ${(v / 1000).toFixed(1)} s`)
             .join(" · ")}
@@ -134,7 +197,9 @@ export function IntakeResult({ intake }: { intake: IntakeCase }) {
       )}
 
       <section className="rounded-xl border border-foreground/15 p-5">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-foreground/50">Transcript</h2>
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-foreground/50">
+          {intake.source === "message" ? "Message" : "Transcript"}
+        </h2>
         <p className="leading-relaxed">{intake.transcript.text}</p>
       </section>
 

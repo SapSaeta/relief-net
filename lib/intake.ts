@@ -30,7 +30,7 @@ async function timed<T>(timings: Record<string, number>, label: string, fn: () =
   }
 }
 
-export async function runIntake(video: File): Promise<IntakeCase> {
+export async function runIntake(video: File, location?: string): Promise<IntakeCase> {
   const id = randomUUID();
   const ledger = new UsageLedger(id);
   const work = await mkdtemp(join(tmpdir(), "relief-net-"));
@@ -90,6 +90,8 @@ export async function runIntake(video: File): Promise<IntakeCase> {
     const intake: IntakeCase = {
       id,
       createdAt: new Date().toISOString(),
+      source: "video",
+      location,
       fileId: file.id,
       durationSec,
       transcript,
@@ -109,5 +111,42 @@ export async function runIntake(video: File): Promise<IntakeCase> {
   } finally {
     await ledger.flush();
     await rm(work, { recursive: true, force: true });
+  }
+}
+
+/** Requests that arrive as a typed message (phone line, SMS, form): same drafting and checks, no media. */
+export async function runMessageIntake(input: { message: string; location?: string; receivedAt?: string }): Promise<IntakeCase> {
+  const id = randomUUID();
+  const ledger = new UsageLedger(id);
+  const timingsMs: Record<string, number> = {};
+  const transcript = { text: input.message, durationMs: 0, turns: [] };
+  try {
+    let request: IntakeCase["request"] = null;
+    let requestError: string | undefined;
+    try {
+      request = await timed(timingsMs, "request", () => draftHelpRequest({ transcript, frames: [] }, ledger));
+    } catch (error) {
+      console.error("help request failed", error);
+      requestError = "drafting failed; it can be retried";
+    }
+    const intake: IntakeCase = {
+      id,
+      createdAt: input.receivedAt ?? new Date().toISOString(),
+      source: "message",
+      location: input.location,
+      fileId: "",
+      durationSec: 0,
+      transcript,
+      frames: [],
+      request,
+      requestError,
+      timingsMs,
+      usage: ledger.entries,
+      costUsd: ledger.totalUsd,
+    };
+    await saveCase(intake);
+    return intake;
+  } finally {
+    await ledger.flush();
   }
 }

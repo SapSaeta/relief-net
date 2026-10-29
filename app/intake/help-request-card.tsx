@@ -17,7 +17,7 @@ const FLAG_TEXT: Record<string, string> = {
 
 const plural = (n: number | null, one: string, many = `${one}s`) => (n === null ? `? ${many}` : `${n} ${n === 1 ? one : many}`);
 
-function Badge({ value }: { value: string }) {
+export function Badge({ value }: { value: string }) {
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase ${PRIORITY_STYLES[value] ?? PRIORITY_STYLES.low}`}>
       {value}

@@ -1,4 +1,4 @@
-import { IntakeForm } from "./intake-form";
+import { IntakeForm, MessageForm } from "./intake-form";
 
 export const metadata = { title: "Intake · relief-net" };
 
@@ -16,6 +16,10 @@ export default function IntakePage() {
         </p>
       </header>
       <IntakeForm />
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">No video? Type your request</h2>
+        <MessageForm />
+      </section>
     </main>
   );
 }

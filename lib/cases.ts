@@ -1,6 +1,6 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { HelpRequest } from "@/lib/request";
@@ -16,6 +16,11 @@ const CASES_DIR = join(process.cwd(), ".data", "cases");
 export type IntakeCase = {
   id: string;
   createdAt: string;
+  /** How the request arrived; older cases without it are videos. */
+  source?: "video" | "message";
+  /** Address or area given by the person (free text, synthetic in this project). */
+  location?: string;
+  /** Meta Files API id of the video; empty for messages. */
   fileId: string;
   durationSec: number;
   transcript: Transcript;
@@ -43,4 +48,16 @@ export async function loadCase(id: string): Promise<IntakeCase | null> {
   } catch {
     return null;
   }
+}
+
+/** All stored cases, newest first. */
+export async function listCases(): Promise<IntakeCase[]> {
+  let names: string[] = [];
+  try {
+    names = (await readdir(CASES_DIR)).filter((n) => n.endsWith(".json"));
+  } catch {
+    return [];
+  }
+  const cases = await Promise.all(names.map((n) => loadCase(n.slice(0, -".json".length))));
+  return cases.filter((c): c is IntakeCase => c !== null).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
