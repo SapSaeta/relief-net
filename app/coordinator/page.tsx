@@ -8,6 +8,7 @@ import { defaultProvider, openWeightsConfigured, PROVIDER_LABELS } from "@/lib/l
 import { loadTriage, type TriageRun } from "@/lib/triage";
 import { TIER_LABELS, type DuplicateGroup, type QueueItem } from "@/lib/triage-rules";
 
+import { MergeButton } from "./merge-button";
 import { TriageControls } from "./triage-controls";
 
 export const metadata = { title: "Coordinator · relief-net" };
@@ -18,8 +19,9 @@ export default function CoordinatorPage() {
       <header className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">Coordinator</h1>
         <p className="text-foreground/70">
-          Muse Spark proposes duplicates and an order with reasons. Code accepts a duplicate only when each request is backed by
-          its own words, and keeps safety tiers in place: 112 first, then critical, high, medium, low. You decide what happens next.
+          Muse Spark proposes duplicates and an order with reasons. Code merges a duplicate on its own only when each request is
+          backed by its own words and the locations match; otherwise you confirm it. Safety tiers stay in place: 112 first, then
+          critical, high, medium, low. You decide what happens next.
         </p>
       </header>
       <Suspense fallback={<p className="text-sm text-foreground/60">Loading requests…</p>}>
@@ -55,7 +57,8 @@ async function Dashboard() {
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
           <Stat label="Open requests" value={open.length} />
           {triage && <Stat label="In queue" value={queue.length} />}
-          {triage && <Stat label="Duplicates merged" value={triage.duplicates.filter((d) => d.verified).reduce((n, d) => n + d.caseIds.length - 1, 0)} />}
+          {triage && <Stat label="Duplicates merged" value={triage.duplicates.filter((d) => d.status === "merged").reduce((n, d) => n + d.caseIds.length - 1, 0)} />}
+          {triage && <Stat label="To confirm" value={triage.duplicates.filter((d) => d.status === "possible").length} />}
           {triage && <Stat label="Raised by safety rule" value={queue.filter((q) => q.raisedByRule).length} />}
         </div>
         {triage && <RunInfo run={triage} />}
@@ -68,10 +71,44 @@ async function Dashboard() {
         </p>
       )}
 
+      {triage && triage.duplicates.some((d) => d.status === "possible") && (
+        <section className="flex flex-col gap-3 rounded-xl border border-orange-500/50 p-5">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/60">Possible duplicates to confirm</h2>
+            <p className="mt-1 text-xs text-foreground/60">
+              Merged automatically only when every request is backed by its own words and the locations match. Otherwise you decide.
+            </p>
+          </div>
+          <ul className="flex flex-col gap-3">
+            {triage.duplicates
+              .filter((d) => d.status === "possible")
+              .map((d) => (
+                <li key={d.key} className="flex flex-col gap-1.5 rounded-lg bg-foreground/5 px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{d.caseIds.map((id) => byId.get(id)?.location ?? "location unknown").join("  +  ")}</span>
+                    <span className="ml-auto">
+                      <MergeButton groupKey={d.key} action="confirm" />
+                    </span>
+                  </div>
+                  <p className="text-foreground/70">{d.reason}</p>
+                  <Quotes group={d} byId={byId} />
+                  <p className="text-xs text-orange-700 dark:text-orange-300">Not merged automatically: {d.check}</p>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+
       {triage ? (
         <ol className="flex flex-col gap-3">
           {queue.map((item) => (
-            <QueueCard key={item.caseId} item={item} intake={byId.get(item.caseId)!} byId={byId} group={triage.duplicates.find((d) => d.verified && d.keepId === item.caseId)} />
+            <QueueCard
+              key={item.caseId}
+              item={item}
+              intake={byId.get(item.caseId)!}
+              byId={byId}
+              group={triage.duplicates.find((d) => d.status === "merged" && d.keepId === item.caseId)}
+            />
           ))}
         </ol>
       ) : (
@@ -82,22 +119,6 @@ async function Dashboard() {
             </li>
           ))}
         </ul>
-      )}
-
-      {triage && triage.duplicates.some((d) => !d.verified) && (
-        <section className="rounded-xl border border-foreground/15 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">Possible duplicates not merged</h2>
-          <ul className="mt-2 flex flex-col gap-2 text-sm">
-            {triage.duplicates
-              .filter((d) => !d.verified)
-              .map((d, i) => (
-                <li key={i}>
-                  {d.caseIds.map((id) => byId.get(id)?.location ?? id.slice(0, 8)).join(" + ")} · {d.reason}{" "}
-                  <span className="text-orange-600">({d.check})</span>
-                </li>
-              ))}
-          </ul>
-        </section>
       )}
     </div>
   );
@@ -184,26 +205,43 @@ function QueueCard({
           </p>
         )}
         {group && (
-          <div className="rounded-lg bg-foreground/5 px-3 py-2 text-xs">
-            <p className="font-medium">
-              Merged {item.duplicateIds.length} duplicate report{item.duplicateIds.length === 1 ? "" : "s"}: {group.reason}
-            </p>
-            <ul className="mt-1 flex flex-col gap-1">
-              {group.quotes.map((q, i) => (
-                <li key={i} className={q.verified ? "text-green-800 dark:text-green-300" : "text-red-700 dark:text-red-300"} title={q.check}>
-                  {q.verified ? "✓" : "✗"} {q.caseId === item.caseId ? "this request" : (byId.get(q.caseId)?.location ?? "another request")}
-                  {byId.get(q.caseId)?.source === "message" ? " (message)" : " (video)"}: “{q.quote}”
-                </li>
+          <div className="flex flex-col gap-1 rounded-lg bg-foreground/5 px-3 py-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium">
+                {group.mergedBy === "coordinator" ? "Merged by the coordinator" : "Merged automatically (quotes verified, same location)"}:{" "}
+                {item.duplicateIds.length} duplicate report{item.duplicateIds.length === 1 ? "" : "s"}. {group.reason}
+              </p>
+              <span className="ml-auto">
+                <MergeButton groupKey={group.key} action="undo" />
+              </span>
+            </div>
+            <Quotes group={group} byId={byId} self={item.caseId} />
+            <div>
+              {item.duplicateIds.map((id) => (
+                <Link key={id} href={`/cases/${id}`} className="mr-3 underline underline-offset-2">
+                  Open duplicate
+                </Link>
               ))}
-            </ul>
-            {item.duplicateIds.map((id) => (
-              <Link key={id} href={`/cases/${id}`} className="mr-3 underline underline-offset-2">
-                Open duplicate
-              </Link>
-            ))}
+            </div>
           </div>
         )}
       </div>
     </li>
+  );
+}
+
+function Quotes({ group, byId, self }: { group: DuplicateGroup; byId: Map<string, OpenCase>; self?: string }) {
+  return (
+    <ul className="flex flex-col gap-1 text-xs">
+      {group.quotes.map((q, i) => {
+        const source = byId.get(q.caseId);
+        return (
+          <li key={i} className={q.verified ? "text-green-800 dark:text-green-300" : "text-red-700 dark:text-red-300"} title={q.check}>
+            {q.verified ? "✓" : "✗"} {q.caseId === self ? "this request" : (source?.location ?? "another request")}
+            {source?.source === "message" ? " (message)" : " (video)"}: “{q.quote}”
+          </li>
+        );
+      })}
+    </ul>
   );
 }

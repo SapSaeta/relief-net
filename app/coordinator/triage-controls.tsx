@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { rememberAccessCode } from "./access-code";
+
 const OPTIONS = [
   { value: "baseten", label: "Muse Spark Open · Baseten (open weights)" },
   { value: "meta", label: "Muse Spark 1.3 · Meta API" },
@@ -24,6 +26,7 @@ export function TriageControls({ defaultProvider, openWeights }: { defaultProvid
         body: JSON.stringify({ provider: form.get("provider") }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? `Triage failed (${res.status})`);
+      rememberAccessCode(String(form.get("accessCode") ?? ""));
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Triage failed");

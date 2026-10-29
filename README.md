@@ -126,18 +126,20 @@ Every model call is recorded with tokens or units, latency and cost (the store's
 
 ## 📋 Coordinator triage (working)
 
-![Coordinator dashboard: 15 requests triaged, 112 first, duplicates merged with verified quotes](docs/assets/coordinator-triage.jpg)
+![Coordinator dashboard: a possible duplicate to confirm, 112 first, two requests raised by the safety rule](docs/assets/coordinator-triage.jpg)
 
 <sub>Synthetic “Riverside flood” scenario (`fixtures/riverside-flood.json`): the video walkthrough plus 14 typed messages, all fictional.</sub>
 
-One model call over every open request proposes **duplicates** and a **queue with a reason per request**. Code then decides what is accepted:
+One model call over every open request proposes **duplicates** and a **queue with a reason per request**. Code and the coordinator decide what is accepted:
 
 ```mermaid
 flowchart LR
     C["📥 15 open requests<br/>summary · flags · own words"] --> M["🧠 Muse Spark<br/>Meta API or Baseten"]
-    M -->|duplicate groups + quotes| D{"🔍 every member backed<br/>by a verified quote<br/>from its own words?"}
+    M -->|duplicate groups + quotes| D{"🔍 verified quote from<br/>every member AND same<br/>normalized location?"}
     D -- yes --> MERGE["🔗 merged; kept request<br/>inherits the most urgent tier"]
-    D -- no --> SHOW["⚠️ shown as possible,<br/>not merged"]
+    D -- no --> SHOW["⚠️ possible duplicate"]
+    SHOW -->|👤 Confirm merge| MERGE
+    MERGE -->|👤 Undo merge| SHOW
     M -->|order + reasons| T["🚦 stable sort by safety tier<br/>112 › critical › high › medium › low"]
     MERGE --> T
     T --> Q["📋 queue for the human<br/>↑ marks rule overrides"]
@@ -146,17 +148,21 @@ flowchart LR
 | Check in `lib/triage-rules.ts` | Why |
 |---|---|
 | Duplicate quotes (3+ words) must appear in each member's own words | the model cannot merge two households on a hunch |
+| Automatic merge also needs the same normalized location (`4, Mill Ln.` = `4 Mill Lane`); otherwise the coordinator confirms | “mud in the kitchen” is true of many houses on one street |
+| The coordinator can confirm or undo any merge (`/api/triage/merge`, access code, no model call) | the human has the last word; the queue is recomputed from the stored proposal |
 | A case can sit in only one group; unknown refs are dropped | malformed output cannot hide a request |
 | Queue is re-sorted by safety tier, keeping the model's order within a tier | a 112 case is never below a garden fence, whatever the model says |
 | Requests the model leaves out are appended, never lost | nobody disappears from the queue |
 
-The words of each request are passed as delimited, untrusted data. Unit tests (`npm test`) cover merging, invented quotes, overlapping groups, tier overrides and missing items.
+The location and words of each request are passed inside a delimited, untrusted `<request_data>` block. Unit tests (`npm test`) cover automatic and confirmed merges, a generic quote in two different houses, undoing a merge, invented quotes, overlapping groups, inherited tiers, tier overrides and missing items.
+
+In the Riverside scenario both real duplicates are now *possible duplicates*: the neighbour and the self-report give a street without a house number, so the coordinator confirms them.
 
 ### ⚖️ Same triage, both providers (measured)
 
 | | Muse Spark 1.3 · Meta API | Muse Spark Open · Baseten |
 |---|---:|---:|
-| Duplicates found (2 expected) | ✅ 2/2, both verified | ✅ 2/2, both verified |
+| Duplicates found (2 expected) | ✅ 2/2, quotes verified | ✅ 2/2, quotes verified |
 | Traps kept apart (9 vs 11 Church St, 4 vs 5 Mill Lane) | ✅ | ✅ |
 | 112 case first · injection attempt last | ✅ · ✅ | ✅ · ✅ |
 | Safety-rule overrides needed | 0 | 0 |
@@ -164,7 +170,7 @@ The words of each request are passed as delimited, untrusted data. Unit tests (`
 | Tokens in / out | 2,628 / 3,765 | 2,519 / 4,441 |
 | Cost | $0.019 | $0.022 |
 
-One run each on 15 requests; the full comparison with repeated runs and a manual baseline is planned for Nov 2.
+One run each on 15 requests (Oct 29, before the location rule); the full comparison with repeated runs and a manual baseline is planned for Nov 2.
 
 ## 🧩 Architecture
 
@@ -294,6 +300,7 @@ relief-net/
 │   ├── api/intake/route.ts      # POST video → verified help request
 │   ├── api/intake/message/      # POST typed message → verified help request
 │   ├── api/triage/route.ts      # POST: dedupe + prioritize open requests (meta | baseten)
+│   ├── api/triage/merge/        # POST: coordinator confirms or undoes a merge
 │   ├── api/cases/[id]/request/  # re-draft the help request of a stored case
 │   ├── api/usage/route.ts       # GET running usage and cost totals
 │   ├── cases/[id]/page.tsx      # view a stored case
