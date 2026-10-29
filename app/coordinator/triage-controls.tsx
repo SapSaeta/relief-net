@@ -8,7 +8,7 @@ const OPTIONS = [
   { value: "meta", label: "Muse Spark 1.3 · Meta API" },
 ];
 
-export function TriageControls({ defaultProvider }: { defaultProvider: string }) {
+export function TriageControls({ defaultProvider, openWeights }: { defaultProvider: string; openWeights: boolean }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +43,7 @@ export function TriageControls({ defaultProvider }: { defaultProvider: string })
           {OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
+              {o.value === "baseten" && !openWeights ? " (not configured: runs on Meta)" : ""}
             </option>
           ))}
         </select>

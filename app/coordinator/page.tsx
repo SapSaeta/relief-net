@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 import { Badge } from "@/app/intake/help-request-card";
 import { listCases, type IntakeCase } from "@/lib/cases";
-import { defaultProvider, PROVIDER_LABELS } from "@/lib/llm";
+import { defaultProvider, openWeightsConfigured, PROVIDER_LABELS } from "@/lib/llm";
 import { loadTriage, type TriageRun } from "@/lib/triage";
 import { TIER_LABELS, type DuplicateGroup, type QueueItem } from "@/lib/triage-rules";
 
@@ -59,7 +59,7 @@ async function Dashboard() {
           {triage && <Stat label="Raised by safety rule" value={queue.filter((q) => q.raisedByRule).length} />}
         </div>
         {triage && <RunInfo run={triage} />}
-        <TriageControls defaultProvider={defaultProvider()} />
+        <TriageControls defaultProvider={defaultProvider()} openWeights={openWeightsConfigured()} />
       </section>
 
       {fresh.length > 0 && triage && (

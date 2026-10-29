@@ -122,7 +122,7 @@ On the test walkthrough Spark proposed 4 items; SAM located 2 (overturned chair,
 | Muse Spark help request (≈ 6.7k in / 5.3k out tokens) | 1 | 25–38 s | $0.033 |
 | **Total** | **51** | **≈ 47 s** | **≈ $0.17** |
 
-Every model call is recorded with tokens or units, latency and cost (`.data/usage.jsonl`); `GET /api/usage` returns running totals.
+Every model call is recorded with tokens or units, latency and cost (the store's usage log: `.data/usage.jsonl` locally, Redis in production); `GET /api/usage` returns running totals.
 
 ## 📋 Coordinator triage (working)
 
