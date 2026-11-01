@@ -23,7 +23,7 @@ if (!url || !token) {
 }
 
 const local = new FsStore('.data');
-const remote = new RedisStore(new Redis({ url, token, automaticDeserialization: false }));
+const remote = new RedisStore(new Redis({ url, token, automaticDeserialization: false, enableAutoPipelining: false }));
 const SPENT = 'spend-spent-micro-usd';
 
 const cases = await local.listDocs('cases');
@@ -46,7 +46,11 @@ if (existing.length && !replace) {
   process.exit(1);
 }
 
-for (const c of cases) await remote.putDoc('cases', c.id, c);
+for (const c of cases) {
+  const frames = await local.getDoc('case-frames', c.id); // frame images live apart (lib/cases.ts)
+  if (frames) await remote.putDoc('case-frames', c.id, frames);
+  await remote.putDoc('cases', c.id, c);
+}
 if (triage) await remote.putDoc('triage', 'latest', triage);
 if (decisions) await remote.putDoc('triage', 'decisions', decisions);
 if (matching) await remote.putDoc('matching', 'latest', matching);
