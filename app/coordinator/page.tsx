@@ -6,6 +6,8 @@ import { Badge } from "@/app/intake/help-request-card";
 import { ReviewBanner } from "@/app/review-banner";
 import { listCases, type IntakeCase } from "@/lib/cases";
 import { defaultProvider, openWeightsConfigured, PROVIDER_LABELS } from "@/lib/llm";
+import { loadMatching, roster, type MatchRun } from "@/lib/match";
+import { remaining } from "@/lib/match-rules";
 import { loadTriage, type TriageRun } from "@/lib/triage";
 import { TIER_LABELS, type DuplicateGroup, type QueueItem } from "@/lib/triage-rules";
 
@@ -22,7 +24,8 @@ export default function CoordinatorPage() {
         <p className="text-foreground/70">
           Muse Spark proposes duplicates and an order with reasons. Code merges a duplicate on its own only when each request is
           backed by its own words and the locations match; otherwise you confirm it. Safety tiers stay in place: 112 first, then
-          critical, high, medium, low. You decide what happens next.
+          critical, high, medium, low. A matching agent then proposes volunteers and supplies with tool calls, each proposal
+          checked by code. You decide what happens next.
         </p>
       </header>
       <ReviewBanner />
@@ -47,11 +50,12 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: 
 
 async function Dashboard() {
   await connection();
-  const [cases, triage] = await Promise.all([listCases(), loadTriage()]);
+  const [cases, triage, matching] = await Promise.all([listCases(), loadTriage(), loadMatching()]);
   const open = cases.filter((c): c is OpenCase => c.request !== null);
   const byId = new Map(open.map((c) => [c.id, c]));
   const fresh = triage ? open.filter((c) => !triage.caseIds.includes(c.id)) : open;
   const queue = triage?.queue.filter((q) => byId.has(q.caseId)) ?? [];
+  const match = matching && triage && matching.triageId === triage.id ? matching : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -101,6 +105,8 @@ async function Dashboard() {
         </section>
       )}
 
+      {triage && <MatchingPanel run={matching} current={match !== null} />}
+
       {triage ? (
         <ol className="flex flex-col gap-3">
           {queue.map((item) => (
@@ -110,6 +116,7 @@ async function Dashboard() {
               intake={byId.get(item.caseId)!}
               byId={byId}
               group={triage.duplicates.find((d) => d.status === "merged" && d.keepId === item.caseId)}
+              match={match}
             />
           ))}
         </ol>
@@ -184,12 +191,16 @@ function QueueCard({
   intake,
   byId,
   group,
+  match,
 }: {
   item: QueueItem;
   intake: OpenCase;
   byId: Map<string, OpenCase>;
   group?: DuplicateGroup;
+  match: MatchRun | null;
 }) {
+  const assignment = match?.assignments.find((a) => a.caseId === item.caseId);
+  const flag = match?.flags.find((f) => f.caseId === item.caseId);
   return (
     <li className={`flex gap-4 rounded-xl border p-4 text-sm ${item.tier === 0 ? "border-red-600" : "border-foreground/15"}`}>
       <div className="flex w-16 shrink-0 flex-col items-center gap-1.5">
@@ -227,6 +238,12 @@ function QueueCard({
             </div>
           </div>
         )}
+        {assignment && <AssignmentBox assignment={assignment} />}
+        {flag && (
+          <p className={`rounded-lg px-3 py-2 text-xs ${item.tier === 0 ? "bg-red-600/10 text-red-800 dark:text-red-200" : "bg-orange-500/10"}`}>
+            <span className="font-medium">⚑ Flagged for you by the matching agent:</span> {flag.reason}
+          </p>
+        )}
       </div>
     </li>
   );
@@ -245,5 +262,95 @@ function Quotes({ group, byId, self }: { group: DuplicateGroup; byId: Map<string
         );
       })}
     </ul>
+  );
+}
+
+const volunteer = (id: string) => roster.volunteers.find((v) => v.id === id);
+const supplyLabel = (item: string) => roster.supplies.find((s) => s.item === item)?.label ?? item;
+
+function MatchingPanel({ run, current }: { run: MatchRun | null; current: boolean }) {
+  const left = remaining(roster, current && run ? run.assignments : []);
+  return (
+    <section className="flex flex-col gap-4 rounded-xl border border-foreground/15 p-5">
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/60">Volunteers and supplies</h2>
+        <p className="mt-1 text-xs text-foreground/60">
+          The agent searches the roster with tools and proposes one assignment per request, most urgent first. Code checks each
+          proposal (skills, capacity, stock, 112 and professionals on hazardous sites) and sends problems back for the agent to fix.
+          Nothing is dispatched: every assignment waits for your approval.
+        </p>
+      </div>
+      {run && current && (
+        <>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <Stat label="Proposed assignments" value={run.assignments.length} />
+            <Stat label="Flagged for you" value={run.flags.length} />
+            {run.unhandled.length > 0 && <Stat label="Not handled" value={run.unhandled.length} />}
+            <Stat label="Tool calls rejected by code" value={run.steps.filter((s) => !s.ok).length} />
+          </div>
+          <p className="text-xs text-foreground/60">
+            Last matching {time(run.at)} by <strong>{PROVIDER_LABELS[run.provider]}</strong> ({run.model}) · {run.rounds} rounds ·{" "}
+            {run.steps.length} tool results · {(run.latencyMs / 1000).toFixed(1)} s · ${run.costUsd.toFixed(3)}
+            {run.stopped && <span className="text-orange-600"> · {run.stopped}</span>}
+          </p>
+          {run.summary && <p className="whitespace-pre-line rounded-lg bg-foreground/5 px-3 py-2 text-sm">{run.summary.replaceAll("**", "")}</p>}
+          <details className="text-xs">
+            <summary className="cursor-pointer font-medium">Agent trace: every tool call and what code answered</summary>
+            <ol className="mt-2 flex flex-col gap-1">
+              {run.steps.map((step, i) => (
+                <li key={i} className={step.ok ? "" : "text-red-700 dark:text-red-300"}>
+                  <span className="tabular-nums text-foreground/50">round {step.round}</span> · <code>{step.tool}</code>
+                  {typeof step.args === "object" && step.args && "ref" in step.args ? ` ${String((step.args as { ref: unknown }).ref)}` : ""} →{" "}
+                  {step.ok ? "✓" : "✗"} {step.result}
+                </li>
+              ))}
+            </ol>
+          </details>
+        </>
+      )}
+      {run && !current && <p className="text-sm text-orange-700 dark:text-orange-300">The last matching was for an earlier triage. Run it again.</p>}
+      <details className="text-xs">
+        <summary className="cursor-pointer font-medium">
+          Roster (synthetic): {roster.volunteers.length} volunteers, {roster.supplies.length} kinds of supplies
+        </summary>
+        <div className="mt-2 grid gap-1 sm:grid-cols-2">
+          {roster.volunteers.map((v) => (
+            <p key={v.id}>
+              <strong>{v.id}</strong> {v.name} · {v.area} · {v.skills.map((k) => k.replaceAll("_", " ")).join(", ")}
+              {v.professional && ` · ${v.professional.replace("_", " ")}`}
+              {v.vehicle && " · 🚐"} · {v.available} · {left.capacity(v)}/{v.capacity} free
+            </p>
+          ))}
+        </div>
+        <p className="mt-2">{roster.supplies.map((s) => `${s.label}: ${left.stock(s)}/${s.stock}`).join(" · ")}</p>
+      </details>
+      <TriageControls
+        defaultProvider={defaultProvider()}
+        openWeights={openWeightsConfigured()}
+        endpoint="/api/match"
+        label="Match volunteers"
+        runningLabel="Matching…"
+      />
+    </section>
+  );
+}
+
+function AssignmentBox({ assignment }: { assignment: MatchRun["assignments"][number] }) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-green-600/30 bg-green-600/5 px-3 py-2 text-xs">
+      <p>
+        <span className="font-medium">Proposed:</span>{" "}
+        {assignment.volunteerIds
+          .map((id) => {
+            const v = volunteer(id);
+            return v ? `${v.name}${v.professional ? ` (${v.professional.replace("_", " ")})` : ""}` : id;
+          })
+          .join(", ")}
+        {assignment.supplies.length > 0 && ` · ${assignment.supplies.map((s) => `${s.quantity} × ${supplyLabel(s.item)}`).join(", ")}`}
+        <span className="ml-2 rounded bg-foreground/10 px-1.5 py-0.5">awaiting your approval</span>
+      </p>
+      <p className="text-foreground/70">{assignment.reason}</p>
+      <p className="text-green-800 dark:text-green-300">{assignment.checks.map((c) => `✓ ${c}`).join("  ")}</p>
+    </div>
   );
 }

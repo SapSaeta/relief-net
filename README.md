@@ -176,6 +176,54 @@ In the Riverside scenario both real duplicates are now *possible duplicates*: th
 
 One run each on 15 requests (Oct 29, before the location rule); the full comparison with repeated runs and a manual baseline is planned for Nov 2.
 
+## 🤝 Volunteer matching with tool calls (working)
+
+After triage, a matching agent works through the queue, most urgent first, with four tools. Every proposal is checked by code (`lib/match-rules.ts`). If it is rejected, the problems go back to the model so it can fix the proposal or flag the request. Nothing is dispatched: each assignment waits for the coordinator's approval.
+
+```mermaid
+sequenceDiagram
+    participant A as Muse Spark (Meta API or open weights)
+    participant T as Tools (lib/match.ts)
+    participant R as Code checks (lib/match-rules.ts)
+    participant C as Coordinator
+    A->>T: find_volunteers(skills[], available) · check_supplies(needs[])
+    T-->>A: roster with capacity left · stock left
+    A->>T: propose_assignments([... one per request, queue order])
+    T->>R: check each, in order, against what is already accepted
+    R-->>A: accepted + checks, or the problems to fix
+    A->>T: flag_for_coordinator([112 case, no electrician left ...])
+    A-->>C: assignments, flags and a short plan
+    C->>C: approves before anyone is dispatched
+```
+
+| Check in `lib/match-rules.ts` | Why |
+|---|---|
+| 112 case → no volunteers, flag it | Emergency services respond to danger to life, not volunteers |
+| Structural risk + work inside the property → a structural engineer on the team (as safety lead) | Structural risk goes to professionals |
+| Electrical hazard + work inside → an electrician on the team | Same rule for electrical risk |
+| Shelter, food, transport or medication pickup away from the property → no professional needed | The rule does not block help that happens elsewhere |
+| Every volunteer has a skill for a need the request states, is available and has capacity left | No invented needs, no overbooking |
+| Transport and medication pickup → someone with a vehicle | Logistics only, never medical advice |
+| Supplies cover one of the needs and stay within stock | Scarce items (one pump, one generator) go to the first request that needs them |
+
+![Coordinator dashboard: matching agent with proposed assignments](docs/assets/coordinator-matching.jpg)
+
+<sub>Synthetic roster: 10 volunteers and 8 kinds of supplies (`fixtures/riverside-resources.json`).</sub>
+
+### ⚖️ Same matching, both providers (measured)
+
+| | Muse Spark 1.3 · Meta API | Muse Spark Open · Baseten |
+|---|---:|---:|
+| Requests handled (14) | ✅ 12 assigned + 2 flagged | ✅ 12 assigned + 2 flagged |
+| 112 case flagged, not assigned | ✅ | ✅ |
+| Engineer on the structural-risk house | ✅ | ✅ |
+| Rounds · tool results | 3 · 16 | 6 · 18 |
+| Proposals rejected by code, then fixed | 0 | 1 (a food parcel offered as shelter) |
+| Latency | 28.1 s | 51.9 s |
+| Cost | $0.038 | $0.079 |
+
+[Full traces](docs/evidence/matching-runs.md). Both models flag the sparking socket: the only electrician is already booked by the two Station Road reports, and the coordinator has not merged them yet. Confirming that merge frees him. The Meta API only accepts `tool_choice: "auto"`, so a model that stops before every request is handled gets a reminder of what is still open.
+
 ## 🧩 Architecture
 
 ```mermaid
@@ -188,6 +236,8 @@ flowchart TB
         R1["/api/intake<br/>/api/intake/message"]
         R0["/api/intake/upload<br/>Blob client token"]
         R2["/api/triage"]
+        R3["/api/match<br/>tool-calling agent"]
+        MRULES["lib/match-rules.ts<br/>skills · capacity · stock · 112 · professionals"]
         LIB["lib/meta.ts<br/>openai SDK · Responses API"]
         LLM["lib/llm.ts<br/>provider switch"]
         RULES["lib/triage-rules.ts<br/>verified duplicates · safety tiers"]
@@ -209,6 +259,9 @@ flowchart TB
     BLOB --> R1
     UI1 --> R1
     UI2 --> R2
+    UI2 --> R3
+    R3 --> LLM
+    R3 --> MRULES
     R1 --> LIB
     R2 --> LLM --> RULES
     LIB --> M1 & M2 & M3 & M4
@@ -223,12 +276,12 @@ flowchart TB
 
 | Model | Role in relief-net |
 |---|---|
-| `muse-spark-1.3` | Structured help request (strict JSON schema, video or typed message), scout that proposes what SAM should look for, coordinator triage (deduplication + prioritization); next: tool calls to match volunteers/resources, draft insurance/aid report |
+| `muse-spark-1.3` | Structured help request (strict JSON schema, video or typed message), scout that proposes what SAM should look for, coordinator triage (deduplication + prioritization), matching agent with tool calls (volunteers + supplies); next: draft insurance/aid report |
 | `sam-3.1` | Segments visible damage on key frames as evidence, including damage proposed by Spark |
 | `muse-voice-transcribe-1.0` | Transcribes the narrated walkthrough |
 | Files API (`purpose: "user_data"`) | Video upload |
 | `muse-image-1.0` | Generates the synthetic test scenes (no real photos are used) |
-| `meta-models/muse-spark-open-1026` on Baseten | Default for the coordinator side (triage and dedupe today, tool-call matching next), because open weights are a model the relief organization **can self-host**, keeping request data on infrastructure it controls. The demo itself uses Baseten-hosted inference. Verified: tool calling, strict JSON schema, Responses API ([results](docs/evidence/open-weights-check.md), `node scripts/check-open-weights.mjs`) |
+| `meta-models/muse-spark-open-1026` on Baseten | Default for the coordinator side (triage, dedupe and the tool-calling matching agent), because open weights are a model the relief organization **can self-host**, keeping request data on infrastructure it controls. The demo itself uses Baseten-hosted inference. Verified: tool calling, strict JSON schema, Responses API ([results](docs/evidence/open-weights-check.md), `node scripts/check-open-weights.mjs`) |
 
 Only Standard models are used. The `*-contributor` variants are avoided so that data is not used for training.
 
@@ -240,7 +293,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 27 | Next.js scaffold, video upload, transcription + segmentation pipeline | ✅ |
 | Oct 28 | Structured request with per-frame evidence · evidence verification · agentic grounding · cost ledger | ✅ |
 | Oct 29 | Coordinator dashboard: list, dedupe, priority · provider switch Meta ↔ open weights (Baseten) · typed-message intake · 15-request synthetic scenario | ✅ |
-| Oct 30 | Tool calls to match volunteers/resources, explained reasoning | 🟡 agent + rules working on both providers (Nov 1), dashboard next |
+| Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ✅ (Nov 1) |
 | Oct 31 | Human approval, audit log, safety rules | ⬜ |
 | Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ⬜ |
 | Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | ⬜ |
@@ -272,7 +325,7 @@ The [live demo](https://relief-net-one.vercel.app) opens in **review mode**: a p
 
 | Without the code (anyone with the URL) | With the code |
 |---|---|
-| `/coordinator`: triage queue, reasons, duplicates, safety-rule overrides | Run triage on Meta or open weights |
+| `/coordinator`: triage queue, reasons, duplicates, safety-rule overrides, proposed assignments + agent trace | Run triage or matching on Meta or open weights |
 | `/cases/[id]`: help request, evidence chips, SAM masks, transcript | Confirm or undo a merge |
 | `/api/usage`: running cost | Submit a video or typed message on `/intake` |
 
@@ -338,7 +391,7 @@ relief-net/
 │   ├── api/cases/[id]/request/  # re-draft the help request of a stored case
 │   ├── api/usage/route.ts       # GET running usage and cost totals
 │   ├── cases/[id]/page.tsx      # view a stored case
-│   ├── coordinator/             # triage queue, merged duplicates, provider switch
+│   ├── coordinator/             # triage queue, merged duplicates, matching panel + agent trace, provider switch
 │   ├── review-banner.tsx        # review mode notice (read open, actions need the code)
 │   ├── intake/                  # intake page: upload, help request card, mask overlays
 │   ├── layout.tsx

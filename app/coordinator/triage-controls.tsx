@@ -10,7 +10,20 @@ const OPTIONS = [
   { value: "meta", label: "Muse Spark 1.3 · Meta API" },
 ];
 
-export function TriageControls({ defaultProvider, openWeights }: { defaultProvider: string; openWeights: boolean }) {
+/** Runs a coordinator model call (triage or matching) on the chosen provider, then refreshes the page. */
+export function TriageControls({
+  defaultProvider,
+  openWeights,
+  endpoint = "/api/triage",
+  label = "Run triage",
+  runningLabel = "Triaging…",
+}: {
+  defaultProvider: string;
+  openWeights: boolean;
+  endpoint?: string;
+  label?: string;
+  runningLabel?: string;
+}) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,16 +33,16 @@ export function TriageControls({ defaultProvider, openWeights }: { defaultProvid
     setRunning(true);
     setError(null);
     try {
-      const res = await fetch("/api/triage", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-access-code": String(form.get("accessCode") ?? "") },
         body: JSON.stringify({ provider: form.get("provider") }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? `Triage failed (${res.status})`);
+      if (!res.ok) throw new Error((await res.json()).error ?? `Request failed (${res.status})`);
       rememberAccessCode(String(form.get("accessCode") ?? ""));
       startTransition(() => router.refresh());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Triage failed");
+      setError(e instanceof Error ? e.message : "Request failed");
     } finally {
       setRunning(false);
     }
@@ -62,7 +75,7 @@ export function TriageControls({ defaultProvider, openWeights }: { defaultProvid
           disabled={running}
           className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
         >
-          {running ? "Triaging…" : "Run triage"}
+          {running ? runningLabel : label}
         </button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

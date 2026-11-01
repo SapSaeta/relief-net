@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Publishes the local synthetic scenario (.data/: cases, latest triage, merge decisions, usage log and
+// Publishes the local synthetic scenario (.data/: cases, latest triage, merge decisions, latest matching, usage log and
 // spend counter) to the production Redis store, so judges see a pre-seeded, read-only dashboard.
 // Uses the same store implementations as the app (lib/store), so keys always match.
 //
@@ -29,10 +29,11 @@ const SPENT = 'spend-spent-micro-usd';
 const cases = await local.listDocs('cases');
 const triage = await local.getDoc('triage', 'latest');
 const decisions = await local.getDoc('triage', 'decisions');
+const matching = await local.getDoc('matching', 'latest');
 const usage = await local.readLog('usage');
 const spent = await local.getCounter(SPENT);
 
-console.log(`local:  ${cases.length} cases · triage ${triage ? 'yes' : 'no'} · ${decisions?.decisions?.length ?? 0} merge decisions · ${usage.length} usage entries · $${(spent / 1e6).toFixed(3)} spent`);
+console.log(`local:  ${cases.length} cases · triage ${triage ? 'yes' : 'no'} · ${decisions?.decisions?.length ?? 0} merge decisions · matching ${matching ? 'yes' : 'no'} · ${usage.length} usage entries · $${(spent / 1e6).toFixed(3)} spent`);
 const existing = await remote.listDocs('cases');
 console.log(`remote: ${existing.length} cases`);
 
@@ -48,10 +49,11 @@ if (existing.length && !replace) {
 for (const c of cases) await remote.putDoc('cases', c.id, c);
 if (triage) await remote.putDoc('triage', 'latest', triage);
 if (decisions) await remote.putDoc('triage', 'decisions', decisions);
+if (matching) await remote.putDoc('matching', 'latest', matching);
 if (!(await remote.readLog('usage')).length) {
   await remote.append('usage', usage);
   await remote.incrBy(SPENT, spent - (await remote.getCounter(SPENT)));
 } else {
   console.log('Usage log already present in production: left as is.');
 }
-console.log(`✓ published ${cases.length} cases${triage ? ', triage' : ''}${decisions ? ', merge decisions' : ''}`);
+console.log(`✓ published ${cases.length} cases${triage ? ', triage' : ''}${decisions ? ', merge decisions' : ''}${matching ? ', matching' : ''}`);
