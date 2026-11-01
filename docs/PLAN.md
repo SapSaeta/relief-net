@@ -15,7 +15,7 @@ Own goal: submit before 20:00 Madrid on Nov 4.
 
 ## Deploy decision (taken Oct 27, revised Oct 29)
 
-Vercel functions accept ~4.5 MB request bodies and have no persistent disk, so the live demo uses:
+Vercel functions accept ~4.5 MB request bodies and have no persistent disk, so the live demo uses (first production deploy Nov 1: https://relief-net-one.vercel.app, review mode verified; paid routes return 401 without the access code):
 
 - **Upload (implemented Oct 29):** with `BLOB_READ_WRITE_TOKEN` set, the browser uploads the video straight to a **private** Vercel Blob (client upload; `/api/intake/upload` requires the access code and only issues tokens for MP4/MOV up to 200 MB under `intake/`). `/api/intake` receives only the blob pathname, streams it to `/tmp`, runs the pipeline and deletes the blob. Without the token (local development) the browser posts multipart as before.
 - **Blob is for videos only.** Nothing else is stored there.

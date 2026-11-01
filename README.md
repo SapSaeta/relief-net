@@ -6,6 +6,8 @@
 
 From a phone video of a damaged home to a prioritized, evidence-backed help request, with a human coordinator approving every dispatch.
 
+**Live demo (review mode): [relief-net-one.vercel.app](https://relief-net-one.vercel.app)**
+
 ![Hackathon](https://img.shields.io/badge/Meta_Global_AI_Developer_Hackathon-Indie_track-0866FF?style=for-the-badge&logo=meta&logoColor=white)
 
 ![Next.js](https://img.shields.io/badge/Next.js-TypeScript-000000?style=flat-square&logo=nextdotjs)
@@ -266,7 +268,7 @@ gantt
 
 ## 🧑‍⚖️ For judges: review mode
 
-The live demo opens in **review mode**: a pre-seeded, fully synthetic scenario (the Riverside flood: 1 video walkthrough + 14 typed messages) that anyone can read, while everything that costs money or changes a decision needs the demo access code.
+The [live demo](https://relief-net-one.vercel.app) opens in **review mode**: a pre-seeded, fully synthetic scenario (the Riverside flood: 1 video walkthrough + 14 typed messages) that anyone can read, while everything that costs money or changes a decision needs the demo access code.
 
 | Without the code (anyone with the URL) | With the code |
 |---|---|
