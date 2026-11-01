@@ -24,7 +24,8 @@ export type AuditEntry = {
     | "matching.rejected"
     | "assignment.approve"
     | "assignment.reject"
-    | "report.drafted";
+    | "report.drafted"
+    | "baseline.recorded";
   summary: string;
   caseIds?: string[];
   runId?: string;

@@ -338,7 +338,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ✅ (Nov 1) |
 | Oct 31 | Human approval, audit log, safety rules | ✅ (Nov 1) |
 | Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ✅ intake → triage → matching → approval → report |
-| Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | ⬜ |
+| Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | 🟡 tooling ready (`/baseline`, `scripts/eval-triage.mjs`), manual run next |
 | Nov 3 | Polish, Vercel deploy, demo video | ⬜ |
 | Nov 4 | Submission | ⬜ |
 
@@ -433,6 +433,8 @@ relief-net/
 │   ├── api/triage/merge/        # POST: coordinator confirms or undoes a merge
 │   ├── api/match/route.ts       # POST: matching agent proposes volunteers + supplies (meta | baseten)
 │   ├── api/match/decide/        # POST: coordinator approves (dispatch) or rejects an assignment
+│   ├── baseline/                # timed manual triage, no AI on screen (the baseline)
+│   ├── api/baseline/route.ts    # POST: records one manual triage
 │   ├── audit/page.tsx           # audit log: every action and who took it
 │   ├── api/cases/[id]/request/  # re-draft the help request of a stored case
 │   ├── api/cases/[id]/report/   # POST: draft the insurance/aid report of a case
@@ -460,6 +462,8 @@ relief-net/
 │   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger + spend counter
 │   ├── report.ts                # insurance/aid draft report (Muse Spark, strict JSON schema)
 │   ├── report-rules.ts          # citation checks, unverified marks, no valuations or advice (+ report-rules.test.ts)
+│   ├── baseline.ts              # manual triage runs in the store
+│   ├── triage-score.ts          # scores any triage vs the scenario: 7 checks, Kendall τ (+ triage-score.test.ts)
 │   ├── audit.ts                 # append-only audit log (public · model · rule · coordinator)
 │   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap
 │   ├── blob.ts                  # private video blobs: download to /tmp, then delete
@@ -478,6 +482,7 @@ relief-net/
 │   ├── check-meta-api.mjs       # API key + model access check
 │   ├── check-open-weights.mjs   # Muse Spark Open on Baseten: Responses, tools, strict JSON
 │   ├── seed-scenario.mjs        # posts the synthetic scenario to a running server
+│   ├── eval-triage.mjs          # triage per provider + manual runs, scored → docs/evidence/baseline-comparison.md
 │   ├── eval-injection.mjs       # repeats triage per provider; injection pass rate + latency
 │   ├── publish-snapshot.mjs     # copies the local synthetic scenario to production Redis
 │   ├── backfill-audit.mjs       # one-off: rebuilds pre-log actions from stored records, marked backfilled
