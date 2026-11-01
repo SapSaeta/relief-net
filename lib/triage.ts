@@ -2,11 +2,13 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import { audit } from "@/lib/audit";
 import { listCases, type IntakeCase } from "@/lib/cases";
 import { llm, type Llm } from "@/lib/llm";
 import { store } from "@/lib/store";
 import {
   applyTriageRules,
+  TIER_LABELS,
   type DuplicateGroup,
   type MergeDecision,
   type ModelTriage,
@@ -167,7 +169,30 @@ export async function runTriage(provider?: Provider, options: { save?: boolean }
       proposal,
       ...applyTriageRules(inputs, proposal, await loadDecisions()),
     };
-    if (options.save !== false) await store().putDoc(TRIAGE, LATEST, run);
+    if (options.save !== false) {
+      await store().putDoc(TRIAGE, LATEST, run);
+      await audit(
+        {
+          actor: "model",
+          action: "triage.run",
+          summary: `Ranked ${run.queue.length} requests and proposed ${run.duplicates.length} duplicate group${run.duplicates.length === 1 ? "" : "s"} in ${(run.latencyMs / 1000).toFixed(1)} s`,
+          runId: run.id,
+          model: `${run.provider} · ${run.model}`,
+        },
+        ...run.duplicates
+          .filter((d) => d.mergedBy === "rule")
+          .map((d) => ({ actor: "rule" as const, action: "merge.auto" as const, summary: `Merged automatically: ${d.check}`, caseIds: d.caseIds, runId: run.id })),
+        ...run.queue
+          .filter((q) => q.raisedByRule)
+          .map((q) => ({
+            actor: "rule" as const,
+            action: "queue.raised" as const,
+            summary: `Raised to #${q.rank} by safety tier (${TIER_LABELS[q.tier]}); the model ranked it #${q.modelRank}`,
+            caseIds: [q.caseId],
+            runId: run.id,
+          })),
+      );
+    }
     return run;
   } finally {
     await ledger.flush();
@@ -192,5 +217,13 @@ export async function decideMerge(key: string, action: MergeDecision["action"]):
   await store().putDoc(TRIAGE, DECISIONS, { decisions });
   const updated: TriageRun = { ...run, ...applyTriageRules(run.inputs, run.proposal, decisions) };
   await store().putDoc(TRIAGE, LATEST, updated);
+  const group = updated.duplicates.find((d) => d.key === key)!;
+  await audit({
+    actor: "coordinator",
+    action: action === "confirm" ? "merge.confirm" : "merge.undo",
+    summary: action === "confirm" ? `Confirmed duplicate: ${group.reason}` : "Undid a merge: both requests are back in the queue",
+    caseIds: group.caseIds,
+    runId: run.id,
+  });
   return updated;
 }

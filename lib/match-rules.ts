@@ -133,3 +133,29 @@ export function checkAssignment(roster: Roster, cases: MatchCase[], accepted: As
   if (problems.length) return { accepted: false, problems };
   return { accepted: true, assignment: { ...proposal, needs, volunteerIds: ids, caseId: target.caseId, checks } };
 }
+
+/** The coordinator's decision on an accepted proposal. Approving dispatches it (simulated in the demo), so
+ *  both decisions are final: a later change of plan is a new matching run, not an edit. */
+export type AssignmentDecision = {
+  status: "proposed" | "approved" | "rejected";
+  decidedAt?: string;
+  note?: string;
+};
+
+export type DecidedAssignment = Assignment & AssignmentDecision;
+
+export function decideAssignment(
+  assignments: DecidedAssignment[],
+  caseId: string,
+  action: "approve" | "reject",
+  at: string,
+  note = "",
+): { assignments: DecidedAssignment[] } | { error: string; status: number } {
+  const current = assignments.find((a) => a.caseId === caseId);
+  if (!current) return { error: "No proposed assignment for this request in the latest matching", status: 404 };
+  if (current.status !== "proposed") return { error: `Already ${current.status}`, status: 409 };
+  const status = action === "approve" ? "approved" : "rejected";
+  return {
+    assignments: assignments.map((a) => (a.caseId === caseId ? { ...a, status, decidedAt: at, note: note.trim().slice(0, 300) || undefined } : a)),
+  };
+}

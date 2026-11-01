@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { toFile } from "openai";
 
+import { audit } from "@/lib/audit";
 import { saveCase, type IntakeCase } from "@/lib/cases";
 import { extractAudioWav, extractFrames, normalizeVideo, probeDurationSec } from "@/lib/media";
 import { meta } from "@/lib/meta";
@@ -108,6 +109,14 @@ export async function runIntake(writeVideo: (path: string) => Promise<void>, loc
       costUsd: ledger.totalUsd,
     };
     await saveCase(intake);
+    await audit({
+      actor: "public",
+      action: "intake.received",
+      summary: `${intake.source === "message" ? "Typed message" : "Video walkthrough"} from ${intake.location ?? "unknown location"}: ${
+        intake.request ? `drafted as ${intake.request.priority}, ${intake.request.verification.verified}/${intake.request.verification.total} evidence verified` : "drafting failed"
+      }`,
+      caseIds: [intake.id],
+    });
     return intake;
   } finally {
     await ledger.flush();
@@ -146,6 +155,14 @@ export async function runMessageIntake(input: { message: string; location?: stri
       costUsd: ledger.totalUsd,
     };
     await saveCase(intake);
+    await audit({
+      actor: "public",
+      action: "intake.received",
+      summary: `${intake.source === "message" ? "Typed message" : "Video walkthrough"} from ${intake.location ?? "unknown location"}: ${
+        intake.request ? `drafted as ${intake.request.priority}, ${intake.request.verification.verified}/${intake.request.verification.total} evidence verified` : "drafting failed"
+      }`,
+      caseIds: [intake.id],
+    });
     return intake;
   } finally {
     await ledger.flush();

@@ -15,6 +15,9 @@ export default function Home() {
         <Link href="/coordinator" className="rounded-md border border-foreground/20 px-4 py-2 font-medium">
           Coordinator dashboard
         </Link>
+        <Link href="/audit" className="rounded-md border border-foreground/20 px-4 py-2 font-medium">
+          Audit log
+        </Link>
       </nav>
       <p className="text-sm text-foreground/50">
         Life-threatening emergency? Call <strong>112</strong>.

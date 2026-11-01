@@ -11,6 +11,7 @@ import { remaining } from "@/lib/match-rules";
 import { loadTriage, type TriageRun } from "@/lib/triage";
 import { TIER_LABELS, type DuplicateGroup, type QueueItem } from "@/lib/triage-rules";
 
+import { DecideButtons } from "./decide-buttons";
 import { MergeButton } from "./merge-button";
 import { TriageControls } from "./triage-controls";
 
@@ -269,7 +270,7 @@ const volunteer = (id: string) => roster.volunteers.find((v) => v.id === id);
 const supplyLabel = (item: string) => roster.supplies.find((s) => s.item === item)?.label ?? item;
 
 function MatchingPanel({ run, current }: { run: MatchRun | null; current: boolean }) {
-  const left = remaining(roster, current && run ? run.assignments : []);
+  const left = remaining(roster, current && run ? run.assignments.filter((a) => a.status !== "rejected") : []);
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-foreground/15 p-5">
       <div>
@@ -277,13 +278,19 @@ function MatchingPanel({ run, current }: { run: MatchRun | null; current: boolea
         <p className="mt-1 text-xs text-foreground/60">
           The agent searches the roster with tools and proposes one assignment per request, most urgent first. Code checks each
           proposal (skills, capacity, stock, 112 and professionals on hazardous sites) and sends problems back for the agent to fix.
-          Nothing is dispatched: every assignment waits for your approval.
+          Nothing is dispatched until you approve it; every decision goes to the{" "}
+          <Link href="/audit" className="underline underline-offset-2">
+            audit log
+          </Link>
+          . Approved assignments stay when matching runs again.
         </p>
       </div>
       {run && current && (
         <>
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-            <Stat label="Proposed assignments" value={run.assignments.length} />
+            <Stat label="Awaiting approval" value={run.assignments.filter((a) => a.status === "proposed").length} />
+            <Stat label="Dispatched" value={run.assignments.filter((a) => a.status === "approved").length} />
+            {run.assignments.some((a) => a.status === "rejected") && <Stat label="Rejected" value={run.assignments.filter((a) => a.status === "rejected").length} />}
             <Stat label="Flagged for you" value={run.flags.length} />
             {run.unhandled.length > 0 && <Stat label="Not handled" value={run.unhandled.length} />}
             <Stat label="Tool calls rejected by code" value={run.steps.filter((s) => !s.ok).length} />
@@ -336,21 +343,40 @@ function MatchingPanel({ run, current }: { run: MatchRun | null; current: boolea
 }
 
 function AssignmentBox({ assignment }: { assignment: MatchRun["assignments"][number] }) {
+  const tone =
+    assignment.status === "approved"
+      ? "border-green-600/60 bg-green-600/10"
+      : assignment.status === "rejected"
+        ? "border-foreground/15 bg-foreground/5 opacity-70"
+        : "border-green-600/30 bg-green-600/5";
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-green-600/30 bg-green-600/5 px-3 py-2 text-xs">
-      <p>
-        <span className="font-medium">Proposed:</span>{" "}
-        {assignment.volunteerIds
-          .map((id) => {
-            const v = volunteer(id);
-            return v ? `${v.name}${v.professional ? ` (${v.professional.replace("_", " ")})` : ""}` : id;
-          })
-          .join(", ")}
-        {assignment.supplies.length > 0 && ` · ${assignment.supplies.map((s) => `${s.quantity} × ${supplyLabel(s.item)}`).join(", ")}`}
-        <span className="ml-2 rounded bg-foreground/10 px-1.5 py-0.5">awaiting your approval</span>
-      </p>
+    <div className={`flex flex-col gap-1 rounded-lg border px-3 py-2 text-xs ${tone}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <p>
+          <span className="font-medium">{assignment.status === "proposed" ? "Proposed:" : assignment.status === "approved" ? "Dispatched:" : "Rejected:"}</span>{" "}
+          {assignment.volunteerIds
+            .map((id) => {
+              const v = volunteer(id);
+              return v ? `${v.name}${v.professional ? ` (${v.professional.replace("_", " ")})` : ""}` : id;
+            })
+            .join(", ")}
+          {assignment.supplies.length > 0 && ` · ${assignment.supplies.map((s) => `${s.quantity} × ${supplyLabel(s.item)}`).join(", ")}`}
+        </p>
+        <span className="ml-auto">
+          {assignment.status === "proposed" ? (
+            <DecideButtons caseId={assignment.caseId} />
+          ) : (
+            <span className={`rounded px-1.5 py-0.5 ${assignment.status === "approved" ? "bg-green-700 text-white" : "bg-foreground/10"}`}>
+              {assignment.status === "approved" ? "✓ approved by the coordinator" : "✗ rejected by the coordinator"}
+              {assignment.decidedAt && ` · ${time(assignment.decidedAt)}`}
+            </span>
+          )}
+        </span>
+      </div>
       <p className="text-foreground/70">{assignment.reason}</p>
+      {assignment.note && <p className="text-foreground/70">Coordinator&apos;s note: {assignment.note}</p>}
       <p className="text-green-800 dark:text-green-300">{assignment.checks.map((c) => `✓ ${c}`).join("  ")}</p>
+      {assignment.status === "approved" && <p className="text-foreground/50">Demo: dispatch is simulated, no one is contacted.</p>}
     </div>
   );
 }

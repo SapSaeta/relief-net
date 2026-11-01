@@ -178,7 +178,7 @@ One run each on 15 requests (Oct 29, before the location rule); the full compari
 
 ## 🤝 Volunteer matching with tool calls (working)
 
-After triage, a matching agent works through the queue, most urgent first, with four tools. Every proposal is checked by code (`lib/match-rules.ts`). If it is rejected, the problems go back to the model so it can fix the proposal or flag the request. Nothing is dispatched: each assignment waits for the coordinator's approval.
+After triage, a matching agent works through the queue, most urgent first, with four tools. Every proposal is checked by code (`lib/match-rules.ts`). If it is rejected, the problems go back to the model so it can fix the proposal or flag the request. Nothing is dispatched: each assignment waits for the coordinator's approval (see below).
 
 ```mermaid
 sequenceDiagram
@@ -223,6 +223,22 @@ sequenceDiagram
 | Cost | $0.038 | $0.079 |
 
 [Full traces](docs/evidence/matching-runs.md). Both models flag the sparking socket: the only electrician is already booked by the two Station Road reports, and the coordinator has not merged them yet. Confirming that merge frees him. The Meta API only accepts `tool_choice: "auto"`, so a model that stops before every request is handled gets a reminder of what is still open.
+
+## ✅ Human approval and audit log (working)
+
+Every assignment the agent proposes waits for the coordinator: **Approve & dispatch** or **Reject** (with an optional note). Both decisions are final, need the demo access code and call no model. A rejection and its note go back to the agent on the next matching run, which proposes something else. Approved assignments are kept, and their volunteers and supplies stay taken. In the demo, dispatch is simulated: no one is contacted.
+
+```mermaid
+flowchart LR
+    P["Public<br/>video or message"] -->|intake.received| L[(Audit log<br/>append-only)]
+    M["Model<br/>triage · matching"] -->|triage.run · matching.run| L
+    R["Code rules<br/>auto-merge · safety tier · checks"] -->|merge.auto · queue.raised · matching.rejected| L
+    C["Coordinator"] -->|merge.confirm / undo · assignment.approve / reject| L
+```
+
+![Audit log: who did what, newest first](docs/assets/audit-log.jpg)
+
+<sub>Actions taken before the log existed (Oct 29 intake, triage and merge) were rebuilt from the stored records with their original times and are marked *backfilled* (`scripts/backfill-audit.mjs`).</sub>
 
 ## 🧩 Architecture
 
@@ -269,7 +285,8 @@ flowchart TB
     LLM -->|baseten| O1
     R1 --> VER
     LIB --> LED
-    R1 & R2 --> LOG
+    R1 & R2 & R3 --> LOG
+    UI2 -->|approve / reject| R4["/api/match/decide"] --> LOG
 ```
 
 ## 🤖 Meta models used
@@ -294,7 +311,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 28 | Structured request with per-frame evidence · evidence verification · agentic grounding · cost ledger | ✅ |
 | Oct 29 | Coordinator dashboard: list, dedupe, priority · provider switch Meta ↔ open weights (Baseten) · typed-message intake · 15-request synthetic scenario | ✅ |
 | Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ✅ (Nov 1) |
-| Oct 31 | Human approval, audit log, safety rules | ⬜ |
+| Oct 31 | Human approval, audit log, safety rules | ✅ (Nov 1) |
 | Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ⬜ |
 | Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | ⬜ |
 | Nov 3 | Polish, Vercel deploy, demo video | ⬜ |
@@ -326,6 +343,7 @@ The [live demo](https://relief-net-one.vercel.app) opens in **review mode**: a p
 | Without the code (anyone with the URL) | With the code |
 |---|---|
 | `/coordinator`: triage queue, reasons, duplicates, safety-rule overrides, proposed assignments + agent trace | Run triage or matching on Meta or open weights |
+| `/audit`: every action and who took it | Approve & dispatch or reject an assignment |
 | `/cases/[id]`: help request, evidence chips, SAM masks, transcript | Confirm or undo a merge |
 | `/api/usage`: running cost | Submit a video or typed message on `/intake` |
 
@@ -333,8 +351,8 @@ The [live demo](https://relief-net-one.vercel.app) opens in **review mode**: a p
 
 ## 🛡️ Safety by design
 
-- 👤 **Human in the loop** *(designed for; approval of dispatches lands Oct 31)*: the AI only proposes. Today the coordinator already confirms or undoes duplicate merges.
-- 🧾 **Audit log** *(designed for; lands Oct 31)*: every AI suggestion and human decision will be recorded. Today every model call is recorded in the usage ledger.
+- 👤 **Human in the loop:** the AI only proposes. The coordinator approves or rejects every assignment before anyone is dispatched (dispatch is simulated in the demo), and confirms or undoes duplicate merges. Approvals are final and survive a new matching run.
+- 🧾 **Audit log** ([`/audit`](https://relief-net-one.vercel.app/audit)): an append-only entry for every action, saying who took it: the public (intake), the model (triage, matching), a code rule (auto-merge, safety-tier raise, rejected tool calls) or the coordinator (merges, approvals, rejections with a note). Every model call also has a line in the usage ledger.
 - 🚨 **Emergencies go to 112**, and structural risk goes to professionals. relief-net does not give medical or structural advice.
 - 🔐 **Server-side only:** the API key lives in the server environment and never reaches the browser. Upstream error text stays in the server log.
 - 💸 **Spend guard:** every route that calls a paid model needs a demo access code (required in production, fails closed when unset), has a per-IP daily limit, and stops at a global spend cap: each call atomically reserves its worst-case cost in the persistent store, and the ledger adds the actual cost to an atomic counter.
@@ -388,6 +406,8 @@ relief-net/
 │   ├── api/triage/route.ts      # POST: dedupe + prioritize open requests (meta | baseten)
 │   ├── api/triage/merge/        # POST: coordinator confirms or undoes a merge
 │   ├── api/match/route.ts       # POST: matching agent proposes volunteers + supplies (meta | baseten)
+│   ├── api/match/decide/        # POST: coordinator approves (dispatch) or rejects an assignment
+│   ├── audit/page.tsx           # audit log: every action and who took it
 │   ├── api/cases/[id]/request/  # re-draft the help request of a stored case
 │   ├── api/usage/route.ts       # GET running usage and cost totals
 │   ├── cases/[id]/page.tsx      # view a stored case
@@ -408,8 +428,9 @@ relief-net/
 │   ├── triage.ts                # coordinator triage call + stored run
 │   ├── triage-rules.ts          # verified duplicates, safety tiers (+ triage-rules.test.ts)
 │   ├── match.ts                 # matching agent: tool-calling loop over the triaged queue
-│   ├── match-rules.ts           # assignment checks: skills, capacity, stock, 112/professionals (+ match-rules.test.ts)
+│   ├── match-rules.ts           # assignment checks + approve/reject decisions (+ match-rules.test.ts)
 │   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger + spend counter
+│   ├── audit.ts                 # append-only audit log (public · model · rule · coordinator)
 │   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap
 │   ├── blob.ts                  # private video blobs: download to /tmp, then delete
 │   ├── store/                   # store interface: filesystem (.data/) or Redis (+ store.test.ts)
@@ -429,6 +450,7 @@ relief-net/
 │   ├── seed-scenario.mjs        # posts the synthetic scenario to a running server
 │   ├── eval-injection.mjs       # repeats triage per provider; injection pass rate + latency
 │   ├── publish-snapshot.mjs     # copies the local synthetic scenario to production Redis
+│   ├── backfill-audit.mjs       # one-off: rebuilds pre-log actions from stored records, marked backfilled
 │   ├── split-frame-images.mjs   # one-off: moves frame images out of case documents (Nov 1)
 │   └── make-fixture.mjs         # synthetic test video (Muse Image + say + ffmpeg)
 ├── .env.example                 # environment template (no secrets)

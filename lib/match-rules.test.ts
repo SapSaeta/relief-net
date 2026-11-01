@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { checkAssignment, remaining, type Assignment, type MatchCase, type Roster } from "./match-rules.ts";
+import { checkAssignment, decideAssignment, remaining, type Assignment, type MatchCase, type Roster } from "./match-rules.ts";
 
 const roster: Roster = {
   volunteers: [
@@ -85,4 +85,20 @@ test("help away from a hazardous property needs no professional", () => {
   const roster2: Roster = { ...roster, volunteers: [...roster.volunteers, { id: "V8", name: "Omar", area: "Sports hall", skills: ["shelter"], available: "today", capacity: 1, vehicle: false, professional: null }] };
   const v = checkAssignment(roster2, cases, [], { ref: "R7", needs: ["shelter"], volunteerIds: ["V8"], supplies: [], reason: "" });
   assert.equal(v.accepted, true);
+});
+
+test("the coordinator approves or rejects a proposal once", () => {
+  const proposed = { ...accept([], mud), status: "proposed" as const };
+  const approved = decideAssignment([proposed], "a", "approve", "t1");
+  assert.ok("assignments" in approved);
+  assert.equal(approved.assignments[0].status, "approved");
+  assert.equal(approved.assignments[0].decidedAt, "t1");
+
+  const again = decideAssignment(approved.assignments, "a", "reject", "t2", "changed my mind");
+  assert.deepEqual(again, { error: "Already approved", status: 409 });
+  assert.deepEqual(decideAssignment([proposed], "zz", "approve", "t"), { error: "No proposed assignment for this request in the latest matching", status: 404 });
+
+  const rejected = decideAssignment([proposed], "a", "reject", "t3", "  Ana is needed at the shelter  ");
+  assert.ok("assignments" in rejected);
+  assert.equal(rejected.assignments[0].note, "Ana is needed at the shelter");
 });

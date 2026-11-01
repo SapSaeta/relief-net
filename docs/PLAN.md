@@ -7,7 +7,7 @@ Own goal: submit before 20:00 Madrid on Nov 4.
 - **Oct 28:** structured request (structured output) with per-frame evidence. Agents 102 (17:00): verifiable agents.
 - **Oct 29:** coordinator dashboard: request list, deduplication, priority. Provider switch (`lib/llm.ts`): Muse Spark 1.3 on Meta API or Muse Spark Open on Baseten (open weights).
 - **Oct 30:** tool calls to match volunteers/resources; explained reasoning. Open weights session (Fireworks). *Slipped to Nov 1: synthetic roster (`fixtures/riverside-resources.json`) and deterministic assignment checks (`lib/match-rules.ts`) first, then the tool-calling agent (`lib/match.ts`): batched tools so it finishes in 3 rounds on Meta and 6 on Baseten; Meta only supports `tool_choice: "auto"`, so a model that stops early is reminded what is still open. Done Nov 1 with the dashboard panel (proposals per request, agent trace, roster) and saved traces for both providers (`docs/evidence/matching-runs.md`).*
-- **Oct 31:** human approval + audit log; safety rules (112, professionals).
+- **Oct 31:** human approval + audit log; safety rules (112, professionals). *Done Nov 1: approve & dispatch (simulated) or reject each assignment, final decisions kept across matching runs, rejection notes fed back to the agent; append-only audit log at `/audit` with the actor of every action (public, model, code rule, coordinator); earlier actions backfilled from stored records and marked as such.*
 - **Nov 1:** draft report for insurance/aid; full synthetic end-to-end scenario.
 - **Nov 2:** measurement against the manual baseline (15 requests), on both providers (quality, latency, cost).
 - **Nov 3:** polish, Vercel deploy, README, record the 3-min video.
