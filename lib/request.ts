@@ -11,7 +11,7 @@ import type { UsageLedger } from "@/lib/usage";
 // quotes against the transcript, damage against what SAM detected in that frame.
 
 const PRIORITIES = ["critical", "high", "medium", "low"] as const;
-const NEED_CATEGORIES = [
+export const NEED_CATEGORIES = [
   "mud_removal",
   "drying",
   "debris_removal",

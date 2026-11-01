@@ -2,7 +2,10 @@
 // The model searches volunteers and supplies with tools and proposes assignments; code decides
 // whether each one is acceptable and keeps capacity and stock across all accepted proposals:
 //   - 112 cases get no volunteers: emergency services handle them;
-//   - structural risk needs a structural engineer on the team, electrical hazard an electrician;
+//   - work inside the property (mud, drying, debris, repairs, power) needs a structural engineer on the
+//     team when there is structural risk, and an electrician when there is an electrical hazard; help
+//     away from the property (shelter, food, transport, medication pickup) does not. That professional
+//     may join as safety lead without a matching skill, but someone on the team must have one;
 //   - every volunteer has a skill for a need the case states, is available and has capacity left;
 //   - transport and medication pickup need someone with a vehicle;
 //   - supplies cover one of the assignment's needs and stay within stock.
@@ -45,6 +48,8 @@ export type Assignment = ProposedAssignment & { caseId: string; checks: string[]
 export type Verdict = { accepted: true; assignment: Assignment } | { accepted: false; problems: string[] };
 
 const VEHICLE_NEEDS = ["transport", "medication_pickup"];
+/** Needs met inside the damaged property, where structural and electrical hazards apply. */
+export const ON_SITE_NEEDS = ["mud_removal", "drying", "debris_removal", "temporary_repair", "power"];
 
 /** Capacity and stock left after the accepted assignments. */
 export function remaining(roster: Roster, accepted: Pick<ProposedAssignment, "volunteerIds" | "supplies">[]) {
@@ -76,6 +81,12 @@ export function checkAssignment(roster: Roster, cases: MatchCase[], accepted: As
   if (!needs.length) problems.push("name at least one need the assignment covers");
   if (unstated.length) problems.push(`${proposal.ref} did not ask for: ${unstated.join(", ")} (its needs: ${target.needs.join(", ") || "none"})`);
 
+  const onSite = needs.filter((n) => ON_SITE_NEEDS.includes(n));
+  // The professional a safety rule asks for may join as the team's safety lead without a matching skill.
+  const safetyLead = new Set<string>();
+  if (onSite.length && target.safetyFlags.includes("structural_risk_professional")) safetyLead.add("structural_engineer");
+  if (onSite.length && target.safetyFlags.includes("electrical_hazard")) safetyLead.add("electrician");
+
   const ids = [...new Set(proposal.volunteerIds)];
   if (!ids.length) problems.push("assign at least one volunteer");
   const team: Volunteer[] = [];
@@ -88,17 +99,19 @@ export function checkAssignment(roster: Roster, cases: MatchCase[], accepted: As
     team.push(v);
     if (left.capacity(v) < 1) problems.push(`${id} ${v.name} has no capacity left`);
     const skills = v.skills.filter((s) => needs.includes(s));
-    if (!skills.length) problems.push(`${id} ${v.name} has none of the skills needed (${needs.join(", ")})`);
-    else checks.push(`${id} ${v.name}: ${skills.join(", ")} · available ${v.available}`);
+    if (skills.length) checks.push(`${id} ${v.name}: ${skills.join(", ")} · available ${v.available}`);
+    else if (v.professional && safetyLead.has(v.professional)) checks.push(`${id} ${v.name}: safety lead (${v.professional.replace("_", " ")}) · available ${v.available}`);
+    else problems.push(`${id} ${v.name} has none of the skills needed (${needs.join(", ")})`);
   }
+  if (team.length && team.every((v) => !v.skills.some((s) => needs.includes(s)))) problems.push("no one on the team has a skill for these needs");
 
-  if (target.safetyFlags.includes("structural_risk_professional")) {
+  if (target.safetyFlags.includes("structural_risk_professional") && onSite.length) {
     if (team.some((v) => v.professional === "structural_engineer")) checks.push("structural risk: structural engineer on the team");
-    else problems.push("structural risk: a structural engineer must be on the team before anyone goes in");
+    else problems.push(`structural risk: ${onSite.join(", ")} happens inside the property, so a structural engineer must be on the team`);
   }
-  if (target.safetyFlags.includes("electrical_hazard")) {
+  if (target.safetyFlags.includes("electrical_hazard") && onSite.length) {
     if (team.some((v) => v.professional === "electrician")) checks.push("electrical hazard: electrician on the team");
-    else problems.push("electrical hazard: an electrician must be on the team");
+    else problems.push(`electrical hazard: ${onSite.join(", ")} happens inside the property, so an electrician must be on the team`);
   }
   if (needs.some((n) => VEHICLE_NEEDS.includes(n))) {
     if (team.some((v) => v.vehicle)) checks.push("vehicle on the team");

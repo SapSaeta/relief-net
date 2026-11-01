@@ -6,7 +6,7 @@ Own goal: submit before 20:00 Madrid on Nov 4.
 - **Oct 27:** Next.js scaffold, video upload (Files API), video → transcription + segmentation pipeline. Agents 101 (17:00 Madrid).
 - **Oct 28:** structured request (structured output) with per-frame evidence. Agents 102 (17:00): verifiable agents.
 - **Oct 29:** coordinator dashboard: request list, deduplication, priority. Provider switch (`lib/llm.ts`): Muse Spark 1.3 on Meta API or Muse Spark Open on Baseten (open weights).
-- **Oct 30:** tool calls to match volunteers/resources; explained reasoning. Open weights session (Fireworks). *Slipped to Nov 1: synthetic roster (`fixtures/riverside-resources.json`) and deterministic assignment checks (`lib/match-rules.ts`) first, then the tool-calling agent.*
+- **Oct 30:** tool calls to match volunteers/resources; explained reasoning. Open weights session (Fireworks). *Slipped to Nov 1: synthetic roster (`fixtures/riverside-resources.json`) and deterministic assignment checks (`lib/match-rules.ts`) first, then the tool-calling agent (`lib/match.ts`): batched tools so it finishes in 3 rounds on Meta and 6 on Baseten; Meta only supports `tool_choice: "auto"`, so a model that stops early is reminded what is still open.*
 - **Oct 31:** human approval + audit log; safety rules (112, professionals).
 - **Nov 1:** draft report for insurance/aid; full synthetic end-to-end scenario.
 - **Nov 2:** measurement against the manual baseline (15 requests), on both providers (quality, latency, cost).

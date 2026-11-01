@@ -240,7 +240,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 27 | Next.js scaffold, video upload, transcription + segmentation pipeline | ✅ |
 | Oct 28 | Structured request with per-frame evidence · evidence verification · agentic grounding · cost ledger | ✅ |
 | Oct 29 | Coordinator dashboard: list, dedupe, priority · provider switch Meta ↔ open weights (Baseten) · typed-message intake · 15-request synthetic scenario | ✅ |
-| Oct 30 | Tool calls to match volunteers/resources, explained reasoning | 🟡 rules + roster done (Nov 1), agent next |
+| Oct 30 | Tool calls to match volunteers/resources, explained reasoning | 🟡 agent + rules working on both providers (Nov 1), dashboard next |
 | Oct 31 | Human approval, audit log, safety rules | ⬜ |
 | Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ⬜ |
 | Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | ⬜ |
@@ -334,6 +334,7 @@ relief-net/
 │   ├── api/intake/upload/       # Blob client token for direct video uploads (production)
 │   ├── api/triage/route.ts      # POST: dedupe + prioritize open requests (meta | baseten)
 │   ├── api/triage/merge/        # POST: coordinator confirms or undoes a merge
+│   ├── api/match/route.ts       # POST: matching agent proposes volunteers + supplies (meta | baseten)
 │   ├── api/cases/[id]/request/  # re-draft the help request of a stored case
 │   ├── api/usage/route.ts       # GET running usage and cost totals
 │   ├── cases/[id]/page.tsx      # view a stored case
@@ -353,6 +354,7 @@ relief-net/
 │   ├── llm.ts                   # provider switch: Meta API ↔ Muse Spark Open on Baseten
 │   ├── triage.ts                # coordinator triage call + stored run
 │   ├── triage-rules.ts          # verified duplicates, safety tiers (+ triage-rules.test.ts)
+│   ├── match.ts                 # matching agent: tool-calling loop over the triaged queue
 │   ├── match-rules.ts           # assignment checks: skills, capacity, stock, 112/professionals (+ match-rules.test.ts)
 │   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger + spend counter
 │   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap

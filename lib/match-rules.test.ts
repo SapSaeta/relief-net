@@ -24,6 +24,7 @@ const cases: MatchCase[] = [
   { ref: "R4", caseId: "d", needs: ["power"], safetyFlags: ["electrical_hazard"] },
   { ref: "R5", caseId: "e", needs: ["temporary_repair", "mud_removal"], safetyFlags: ["structural_risk_professional"] },
   { ref: "R6", caseId: "f", needs: ["mud_removal"], safetyFlags: [] },
+  { ref: "R7", caseId: "g", needs: ["shelter", "water_food"], safetyFlags: ["structural_risk_professional"] },
 ];
 
 const mud = { ref: "R1", needs: ["mud_removal"], volunteerIds: ["V1"], supplies: [{ item: "shovel_kit", quantity: 1 }], reason: "nearby" };
@@ -72,6 +73,16 @@ test("transport needs a vehicle", () => {
 
 test("electrical hazard and structural risk need the right professional", () => {
   accept([], { ref: "R4", needs: ["power"], volunteerIds: ["V6"], supplies: [{ item: "generator", quantity: 1 }], reason: "" });
-  assert.match(problems([], { ref: "R5", needs: ["mud_removal"], volunteerIds: ["V1"], supplies: [], reason: "" }), /structural engineer must be on the team/);
+  assert.match(problems([], { ref: "R5", needs: ["mud_removal"], volunteerIds: ["V1"], supplies: [], reason: "" }), /inside the property, so a structural engineer/);
   accept([], { ref: "R5", needs: ["temporary_repair", "mud_removal"], volunteerIds: ["V7", "V1"], supplies: [], reason: "" });
+  const lead = accept([], { ref: "R5", needs: ["mud_removal"], volunteerIds: ["V7", "V1"], supplies: [], reason: "" });
+  assert.match(lead.checks.join("; "), /V7 Helen: safety lead \(structural engineer\)/);
+  assert.match(problems([], { ref: "R5", needs: ["mud_removal"], volunteerIds: ["V7"], supplies: [], reason: "" }), /no one on the team has a skill/);
+  assert.match(problems([], { ref: "R1", needs: ["mud_removal"], volunteerIds: ["V1", "V7"], supplies: [], reason: "" }), /V7 Helen has none of the skills/);
+});
+
+test("help away from a hazardous property needs no professional", () => {
+  const roster2: Roster = { ...roster, volunteers: [...roster.volunteers, { id: "V8", name: "Omar", area: "Sports hall", skills: ["shelter"], available: "today", capacity: 1, vehicle: false, professional: null }] };
+  const v = checkAssignment(roster2, cases, [], { ref: "R7", needs: ["shelter"], volunteerIds: ["V8"], supplies: [], reason: "" });
+  assert.equal(v.accepted, true);
 });
