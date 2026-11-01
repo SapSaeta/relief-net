@@ -7,6 +7,7 @@
 //   node --env-file=.env.production.local scripts/publish-snapshot.mjs            # dry run: shows what would be copied
 //   node --env-file=.env.production.local scripts/publish-snapshot.mjs --write    # copies into an empty store
 //   node --env-file=.env.production.local scripts/publish-snapshot.mjs --write --replace   # also when it is not empty
+//   node --env-file=.env.production.local scripts/publish-snapshot.mjs --only=reports --write  # drafted reports only
 
 import { Redis } from '@upstash/redis';
 
@@ -25,6 +26,36 @@ if (!url || !token) {
 const local = new FsStore('.data');
 const remote = new RedisStore(new Redis({ url, token, automaticDeserialization: false, enableAutoPipelining: false }));
 const SPENT = 'spend-spent-micro-usd';
+
+// --only=reports: copy the drafted insurance/aid reports alone (matching and decisions in production
+// are left as they are), and log each one in the production audit log as backfilled, with its time.
+if (process.argv.includes('--only=reports')) {
+  const reports = await local.listDocs('reports');
+  const known = new Set(await new Redis({ url, token, enableAutoPipelining: false }).smembers('relief-net:docs:cases'));
+  const publishable = reports.filter((r) => known.has(r.caseId));
+  console.log(`${reports.length} local reports · ${publishable.length} for cases that exist in production`);
+  if (!write) {
+    console.log('Dry run. Add --write to copy.');
+    process.exit(0);
+  }
+  for (const r of publishable) await remote.putDoc('reports', r.caseId, r);
+  await remote.append(
+    'audit',
+    publishable
+      .sort((a, b) => a.at.localeCompare(b.at))
+      .map((r) => ({
+        at: r.at,
+        actor: 'model',
+        action: 'report.drafted',
+        summary: `Drafted an insurance/aid report: ${r.report.damage_items.length} damage items, ${r.report.verification.verified}/${r.report.verification.statements} statements backed by verified evidence (drafted locally, copied to the demo)`,
+        caseIds: [r.caseId],
+        model: `meta · ${r.model}`,
+        backfilled: true,
+      })),
+  );
+  console.log(`✓ published ${publishable.length} reports`);
+  process.exit(0);
+}
 
 const cases = await local.listDocs('cases');
 const triage = await local.getDoc('triage', 'latest');

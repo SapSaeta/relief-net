@@ -23,7 +23,8 @@ export type AuditEntry = {
     | "matching.run"
     | "matching.rejected"
     | "assignment.approve"
-    | "assignment.reject";
+    | "assignment.reject"
+    | "report.drafted";
   summary: string;
   caseIds?: string[];
   runId?: string;

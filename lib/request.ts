@@ -27,7 +27,7 @@ const SAFETY_FLAGS = ["call_112_now", "structural_risk_professional", "electrica
 
 const nullable = (type: string) => ({ type: [type, "null"] });
 
-const EVIDENCE_SCHEMA = {
+export const EVIDENCE_SCHEMA = {
   type: "array",
   items: {
     type: "object",
@@ -160,7 +160,7 @@ Rules:
 - Priority reflects risk to people first (children, elderly, medical needs, no shelter), then property.
 - Write in English, concise and factual.`;
 
-function framesTable(frames: SegmentedFrame[]): string {
+export function framesTable(frames: SegmentedFrame[]): string {
   return frames
     .map((f) => {
       const byLabel = new Map<string, { n: number; area: number; conf: number }>();
@@ -179,7 +179,7 @@ function framesTable(frames: SegmentedFrame[]): string {
 // Spoken words cannot close the data block early.
 const stripTags = (s: string) => s.replace(/<\/?transcript>/gi, "");
 
-function transcriptBlock(t: Transcript): string {
+export function transcriptBlock(t: Transcript): string {
   const lines = t.turns.length
     ? t.turns.map((turn) => `[${(turn.startMs / 1000).toFixed(1)}–${(turn.endMs / 1000).toFixed(1)} s] ${stripTags(turn.transcript)}`)
     : [stripTags(t.text)];

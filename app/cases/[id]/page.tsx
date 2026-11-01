@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -23,5 +24,14 @@ export default function CasePage({ params }: PageProps<"/cases/[id]">) {
 async function CaseView({ params }: { params: Promise<{ id: string }> }) {
   const intake = await loadCase((await params).id);
   if (!intake) notFound();
-  return <IntakeResult intake={intake} />;
+  return (
+    <div className="flex flex-col gap-4">
+      {intake.request && (
+        <Link href={`/cases/${intake.id}/report`} className="w-fit rounded-md border border-foreground/20 px-3 py-1.5 text-sm font-medium">
+          📄 Insurance / aid report (draft)
+        </Link>
+      )}
+      <IntakeResult intake={intake} />
+    </div>
+  );
 }

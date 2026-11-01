@@ -20,7 +20,7 @@ const DAY_MS = 24 * 3600 * 1000;
 const RESERVED_COUNTER = "spend-reserved-micro-usd";
 
 /** Worst-case cost of one call per route, so the cap holds before the call is made. */
-export const COST_ESTIMATE_USD = { intake: 0.3, message: 0.06, request: 0.06, triage: 0.15, match: 0.5, health: 0.01 } as const;
+export const COST_ESTIMATE_USD = { intake: 0.3, message: 0.06, request: 0.06, triage: 0.15, match: 0.5, report: 0.08, health: 0.01 } as const;
 
 const callsByIp = new Map<string, number[]>();
 

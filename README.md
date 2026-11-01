@@ -224,6 +224,26 @@ sequenceDiagram
 
 [Full traces](docs/evidence/matching-runs.md). Both models flag the sparking socket: the only electrician is already booked by the two Station Road reports, and the coordinator has not merged them yet. Confirming that merge frees him. The Meta API only accepts `tool_choice: "auto"`, so a model that stops before every request is handled gets a reminder of what is still open.
 
+## 📄 Insurance / aid draft report (working)
+
+From any case, Muse Spark drafts a damage report that the household reviews, completes and sends to their insurer or a public aid office. It uses only the person's words, SAM's detections and the verified help request. Code checks every citation, as it does for the help request. A statement whose citations all fail stays in the draft but is marked *unverified*, so the household knows what still needs proof. Help already received comes from the coordinator's approvals, not from the model.
+
+![Damage report draft: every item backed by a quote and a SAM frame](docs/assets/damage-report.jpg)
+
+| Check in `lib/report-rules.ts` | Why |
+|---|---|
+| Each damage item, impact and safety note cites a quote (3+ words, found verbatim) or a SAM label detected in that frame | Grounded in what was said and seen, never invented |
+| No verified citation → *unverified* label, counted apart | The household sees what to back up before sending |
+| Money values, "worth", "valued at", diagnoses, prescriptions, "safe to enter" → one redraft, then a visible warning | The report is not a valuation and gives no medical or structural advice |
+
+| Case (synthetic) | Statements verified | Citations verified | Latency | Cost |
+|---|---:|---:|---:|---:|
+| 4 Mill Lane · video walkthrough | 11/11 | 23/23 | 19.9 s | $0.030 |
+| 17 Station Road · typed message | 6/6 | 12/12 | 13.6 s | $0.018 |
+| 9 Church Street · typed message | 3/3 | 6/6 | 14.8 s | $0.020 |
+
+Print or save as PDF from the page ([sample PDF](docs/assets/report-sample.pdf)). It also lists what is still missing (policy number, receipts, repair quotes) and a first-person statement drafted from the person's own words, which they edit before signing.
+
 ## ✅ Human approval and audit log (working)
 
 Every assignment the agent proposes waits for the coordinator: **Approve & dispatch** or **Reject** (with an optional note). Both decisions are final, need the demo access code and call no model. A rejection and its note go back to the agent on the next matching run, which proposes something else. Approved assignments are kept, and their volunteers and supplies stay taken. In the demo, dispatch is simulated: no one is contacted.
@@ -254,6 +274,8 @@ flowchart TB
         R2["/api/triage"]
         R3["/api/match<br/>tool-calling agent"]
         MRULES["lib/match-rules.ts<br/>skills · capacity · stock · 112 · professionals"]
+        R5["/api/cases/[id]/report<br/>insurance/aid draft"]
+        RRULES["lib/report-rules.ts<br/>citations · no valuations or advice"]
         LIB["lib/meta.ts<br/>openai SDK · Responses API"]
         LLM["lib/llm.ts<br/>provider switch"]
         RULES["lib/triage-rules.ts<br/>verified duplicates · safety tiers"]
@@ -278,6 +300,9 @@ flowchart TB
     UI2 --> R3
     R3 --> LLM
     R3 --> MRULES
+    UI2 --> R5 --> LIB
+    R5 --> RRULES
+    R5 --> LOG
     R1 --> LIB
     R2 --> LLM --> RULES
     LIB --> M1 & M2 & M3 & M4
@@ -293,7 +318,7 @@ flowchart TB
 
 | Model | Role in relief-net |
 |---|---|
-| `muse-spark-1.3` | Structured help request (strict JSON schema, video or typed message), scout that proposes what SAM should look for, coordinator triage (deduplication + prioritization), matching agent with tool calls (volunteers + supplies); next: draft insurance/aid report |
+| `muse-spark-1.3` | Structured help request (strict JSON schema, video or typed message), scout that proposes what SAM should look for, coordinator triage (deduplication + prioritization), matching agent with tool calls (volunteers + supplies), insurance/aid draft report with verified citations |
 | `sam-3.1` | Segments visible damage on key frames as evidence, including damage proposed by Spark |
 | `muse-voice-transcribe-1.0` | Transcribes the narrated walkthrough |
 | Files API (`purpose: "user_data"`) | Video upload |
@@ -312,7 +337,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 29 | Coordinator dashboard: list, dedupe, priority · provider switch Meta ↔ open weights (Baseten) · typed-message intake · 15-request synthetic scenario | ✅ |
 | Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ✅ (Nov 1) |
 | Oct 31 | Human approval, audit log, safety rules | ✅ (Nov 1) |
-| Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ⬜ |
+| Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ✅ intake → triage → matching → approval → report |
 | Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | ⬜ |
 | Nov 3 | Polish, Vercel deploy, demo video | ⬜ |
 | Nov 4 | Submission | ⬜ |
@@ -344,6 +369,7 @@ The [live demo](https://relief-net-one.vercel.app) opens in **review mode**: a p
 |---|---|
 | `/coordinator`: triage queue, reasons, duplicates, safety-rule overrides, proposed assignments + agent trace | Run triage or matching on Meta or open weights |
 | `/audit`: every action and who took it | Approve & dispatch or reject an assignment |
+| `/cases/[id]/report`: drafted insurance/aid reports, printable | Draft or redraft a report |
 | `/cases/[id]`: help request, evidence chips, SAM masks, transcript | Confirm or undo a merge |
 | `/api/usage`: running cost | Submit a video or typed message on `/intake` |
 
@@ -409,8 +435,10 @@ relief-net/
 │   ├── api/match/decide/        # POST: coordinator approves (dispatch) or rejects an assignment
 │   ├── audit/page.tsx           # audit log: every action and who took it
 │   ├── api/cases/[id]/request/  # re-draft the help request of a stored case
+│   ├── api/cases/[id]/report/   # POST: draft the insurance/aid report of a case
 │   ├── api/usage/route.ts       # GET running usage and cost totals
 │   ├── cases/[id]/page.tsx      # view a stored case
+│   ├── cases/[id]/report/       # printable insurance/aid draft report
 │   ├── coordinator/             # triage queue, merged duplicates, matching panel + agent trace, provider switch
 │   ├── review-banner.tsx        # review mode notice (read open, actions need the code)
 │   ├── intake/                  # intake page: upload, help request card, mask overlays
@@ -430,6 +458,8 @@ relief-net/
 │   ├── match.ts                 # matching agent: tool-calling loop over the triaged queue
 │   ├── match-rules.ts           # assignment checks + approve/reject decisions (+ match-rules.test.ts)
 │   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger + spend counter
+│   ├── report.ts                # insurance/aid draft report (Muse Spark, strict JSON schema)
+│   ├── report-rules.ts          # citation checks, unverified marks, no valuations or advice (+ report-rules.test.ts)
 │   ├── audit.ts                 # append-only audit log (public · model · rule · coordinator)
 │   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap
 │   ├── blob.ts                  # private video blobs: download to /tmp, then delete
