@@ -16,6 +16,8 @@ export type RedisLike = {
   incrby(key: string, amount: number): Promise<number>;
 };
 
+const MGET_CHUNK = 10;
+
 const parse = <T>(value: unknown): T | null => (value === null || value === undefined ? null : (JSON.parse(String(value)) as T));
 
 export class RedisStore implements Store {
@@ -42,7 +44,11 @@ export class RedisStore implements Store {
   async listDocs<T>(collection: string): Promise<T[]> {
     const ids = await this.redis.smembers(`${this.prefix}docs:${checkName(collection)}`);
     if (!ids.length) return [];
-    const values = await this.redis.mget(...ids.map((id) => this.doc(collection, id)));
+    // In chunks: one Upstash request (or response) is capped at 10 MB.
+    const values: unknown[] = [];
+    for (let i = 0; i < ids.length; i += MGET_CHUNK) {
+      values.push(...(await this.redis.mget(...ids.slice(i, i + MGET_CHUNK).map((id) => this.doc(collection, id)))));
+    }
     return values.map((v) => parse<T>(v)).filter((d): d is NonNullable<typeof d> => d !== null) as T[];
   }
 

@@ -413,7 +413,7 @@ relief-net/
 │   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap
 │   ├── blob.ts                  # private video blobs: download to /tmp, then delete
 │   ├── store/                   # store interface: filesystem (.data/) or Redis (+ store.test.ts)
-│   ├── cases.ts                 # cases in the store
+│   ├── cases.ts                 # cases in the store; frame images kept apart (case page only)
 │   └── intake.ts                # pipeline orchestration (video and typed message)
 ├── docs/
 │   ├── assets/                  # screenshots (synthetic data only)
@@ -429,6 +429,7 @@ relief-net/
 │   ├── seed-scenario.mjs        # posts the synthetic scenario to a running server
 │   ├── eval-injection.mjs       # repeats triage per provider; injection pass rate + latency
 │   ├── publish-snapshot.mjs     # copies the local synthetic scenario to production Redis
+│   ├── split-frame-images.mjs   # one-off: moves frame images out of case documents (Nov 1)
 │   └── make-fixture.mjs         # synthetic test video (Muse Image + say + ffmpeg)
 ├── .env.example                 # environment template (no secrets)
 ├── AGENTS.md                    # Next.js agent notes (maintained by next dev)

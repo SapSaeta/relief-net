@@ -18,7 +18,10 @@ function fakeRedis(): RedisLike {
     set: async (k, v) => strings.set(k, v),
     sadd: async (k, m) => sets.set(k, (sets.get(k) ?? new Set()).add(m)),
     smembers: async (k) => [...(sets.get(k) ?? [])],
-    mget: async (...ks) => ks.map((k) => strings.get(k) ?? null),
+    mget: async (...ks) => {
+      if (ks.length > 10) throw new Error("one mget per chunk of 10 keys");
+      return ks.map((k) => strings.get(k) ?? null);
+    },
     rpush: async (k, ...vs) => lists.set(k, [...(lists.get(k) ?? []), ...vs]),
     lrange: async (k) => lists.get(k) ?? [],
     incrby: async (k, n) => {
@@ -55,6 +58,12 @@ for (const [name, make] of implementations) {
       assert.deepEqual(await s.getDoc("cases", "a"), { n: 3 });
       assert.deepEqual((await s.listDocs<{ n: number }>("cases")).map((d) => d.n).sort(), [2, 3]);
       assert.deepEqual(await s.listDocs("empty"), []);
+    });
+
+    test("lists more documents than one read chunk", async () => {
+      const s = await make();
+      await Promise.all(Array.from({ length: 60 }, (_, i) => s.putDoc("many", `d${i}`, { i })));
+      assert.equal((await s.listDocs("many")).length, 60);
     });
 
     test("appends to and reads a log in order", async () => {
