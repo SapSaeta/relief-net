@@ -433,7 +433,7 @@ relief-net/
 │   ├── api/triage/merge/        # POST: coordinator confirms or undoes a merge
 │   ├── api/match/route.ts       # POST: matching agent proposes volunteers + supplies (meta | baseten)
 │   ├── api/match/decide/        # POST: coordinator approves (dispatch) or rejects an assignment
-│   ├── baseline/                # timed manual triage, no AI on screen (the baseline)
+│   ├── baseline/                # timed manual triage, no AI on screen; type a position or ⤒ ↑ ↓
 │   ├── api/baseline/route.ts    # POST: records one manual triage
 │   ├── audit/page.tsx           # audit log: every action and who took it
 │   ├── api/cases/[id]/request/  # re-draft the help request of a stored case

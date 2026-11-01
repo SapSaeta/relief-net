@@ -26,16 +26,16 @@ export function ManualTriage({ requests }: { requests: BaselineRequest[] }) {
     return () => clearInterval(t);
   }, [running]);
 
-  function move(id: string, by: number) {
+  /** Moves a request to a 0-based position (clamped). */
+  function moveTo(id: string, position: number) {
     setOrder((o) => {
-      const i = o.indexOf(id);
-      const j = Math.min(o.length - 1, Math.max(0, i + by));
-      const next = [...o];
-      next.splice(i, 1);
+      const j = Math.min(o.length - 1, Math.max(0, position));
+      const next = o.filter((x) => x !== id);
       next.splice(j, 0, id);
       return next;
     });
   }
+  const move = (id: string, by: number) => moveTo(id, order.indexOf(id) + by);
 
   /** "B is a duplicate of A" links, joined into groups. */
   function groups(): string[][] {
@@ -98,7 +98,9 @@ export function ManualTriage({ requests }: { requests: BaselineRequest[] }) {
     <div className="flex flex-col gap-3">
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-foreground/15 bg-background p-3 text-sm">
         <span className="text-2xl font-semibold tabular-nums">{clock(Math.max(0, now - phase.startedAt))}</span>
-        <span className="text-foreground/60">Most urgent at the top. {groups().length} duplicate group(s) marked.</span>
+        <span className="text-foreground/60">
+          Most urgent at the top: type a position and press Enter, or use ⤒ ↑ ↓. {groups().length} duplicate group(s) marked.
+        </span>
         <button type="button" onClick={() => finish(phase.startedAt)} className="ml-auto rounded-md bg-foreground px-4 py-2 font-medium text-background">
           Done
         </button>
@@ -109,8 +111,26 @@ export function ManualTriage({ requests }: { requests: BaselineRequest[] }) {
           const r = byId.get(id)!;
           return (
             <li key={id} className="flex gap-3 rounded-xl border border-foreground/15 p-3 text-sm">
-              <div className="flex w-10 shrink-0 flex-col items-center gap-1">
-                <span className="text-lg font-semibold tabular-nums">{i + 1}</span>
+              <div className="flex w-12 shrink-0 flex-col items-center gap-1">
+                <input
+                  key={`${id}-${i}`}
+                  aria-label="Position"
+                  inputMode="numeric"
+                  defaultValue={i + 1}
+                  onFocus={(e) => e.target.select()}
+                  onBlur={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    if (Number.isFinite(n) && n !== i + 1) moveTo(id, n - 1);
+                    else e.target.value = String(i + 1);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                  className="w-11 rounded border border-foreground/20 bg-transparent text-center text-lg font-semibold tabular-nums"
+                />
+                <button type="button" aria-label="Move to the top" onClick={() => moveTo(id, 0)} className="rounded border border-foreground/20 px-2">
+                  ⤒
+                </button>
                 <button type="button" aria-label="Move up" onClick={() => move(id, -1)} className="rounded border border-foreground/20 px-2">
                   ↑
                 </button>
