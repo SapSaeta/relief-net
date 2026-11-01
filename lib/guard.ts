@@ -12,7 +12,8 @@ import { SPENT_COUNTER, toMicroUsd } from "@/lib/usage";
 //      the persistent store and releases it when done; the ledger adds the actual cost to the
 //      spent counter. A call proceeds only if spent + all open reservations stay under the cap.
 
-const ACCESS_CODE = process.env.DEMO_ACCESS_CODE ?? "";
+// Trimmed on both sides: a code pasted with a stray space or newline still matches.
+const ACCESS_CODE = (process.env.DEMO_ACCESS_CODE ?? "").trim();
 const SPEND_CAP_USD = Number(process.env.SPEND_CAP_USD ?? 25);
 const MAX_CALLS_PER_IP_PER_DAY = Number(process.env.MAX_CALLS_PER_IP_PER_DAY ?? 20);
 const DAY_MS = 24 * 3600 * 1000;
@@ -38,7 +39,7 @@ export const accessCodeRequired = () => Boolean(ACCESS_CODE) || process.env.NODE
 /** Checks the access code only; for actions that change state without calling a model. */
 export function checkAccessCode(code: string | null | undefined): Response | null {
   if (!ACCESS_CODE) return process.env.NODE_ENV === "production" ? deny(503, "Demo access is not configured") : null;
-  return sameCode(code ?? "", ACCESS_CODE) ? null : deny(401, "Missing or wrong access code");
+  return sameCode((code ?? "").trim(), ACCESS_CODE) ? null : deny(401, "Missing or wrong access code");
 }
 
 export type Guarded = { ok: false; response: Response } | { ok: true; release: () => Promise<void> };

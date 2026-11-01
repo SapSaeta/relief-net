@@ -31,12 +31,16 @@ async function sendVideo(form: FormData, mode: "blob" | "multipart", accessCode:
 
   const video = form.get("video") as File;
   const extension = video.type === "video/quicktime" ? "mov" : "mp4";
+  // The Blob client hides the server's answer ("Failed to retrieve the client token"); the usual cause is the code.
   const blob = await upload(`intake/walkthrough.${extension}`, video, {
     access: "private",
     contentType: video.type,
     handleUploadUrl: "/api/intake/upload",
     headers: { "x-access-code": accessCode },
     multipart: video.size > 20 * 1024 * 1024,
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : "";
+    throw new Error(/client token/i.test(message) ? "Upload not authorized: check the demo access code." : message || "Upload failed");
   });
   return fetch("/api/intake", {
     method: "POST",
@@ -51,7 +55,7 @@ export function IntakeForm({ uploadMode = "multipart" }: { uploadMode?: "blob" |
   async function submit(form: FormData) {
     setState({ status: "running", startedAt: Date.now() });
     try {
-      const res = await sendVideo(form, uploadMode, String(form.get("accessCode") ?? ""));
+      const res = await sendVideo(form, uploadMode, String(form.get("accessCode") ?? "").trim());
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
       setState({ status: "done", intake: json });
@@ -112,7 +116,7 @@ export function MessageForm() {
     try {
       const res = await fetch("/api/intake/message", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-access-code": String(form.get("accessCode") ?? "") },
+        headers: { "Content-Type": "application/json", "x-access-code": String(form.get("accessCode") ?? "").trim() },
         body: JSON.stringify({ message: form.get("message"), location: form.get("location") }),
       });
       const json = await res.json();

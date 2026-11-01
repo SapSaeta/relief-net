@@ -276,7 +276,7 @@ The [live demo](https://relief-net-one.vercel.app) opens in **review mode**: a p
 | `/cases/[id]`: help request, evidence chips, SAM masks, transcript | Confirm or undo a merge |
 | `/api/usage`: running cost | Submit a video or typed message on `/intake` |
 
-**How judges get the code:** it is given privately in the hackathon submission's testing-instructions field, never in this repository, the video or a screenshot. It is a random demo-only value (`DEMO_ACCESS_CODE`), rotated after judging, and the spend cap (`SPEND_CAP_USD`) bounds what any code holder can spend.
+**How judges get the code:** it is given privately in the hackathon submission's testing-instructions field, never in this repository, the video or a screenshot. It is a random demo-only value (`DEMO_ACCESS_CODE`), rotated after judging, and the spend cap (`SPEND_CAP_USD`) bounds what any code holder can spend. Surrounding spaces are ignored; a wrong code on a video upload shows *“Upload not authorized: check the demo access code.”*
 
 ## 🛡️ Safety by design
 
