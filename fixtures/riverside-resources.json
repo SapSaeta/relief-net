@@ -1,0 +1,25 @@
+{
+  "scenario": "Riverside flood (synthetic): volunteers and supplies registered with the community response team on day 2.",
+  "volunteers": [
+    { "id": "V1", "name": "Ana P.", "area": "Mill Lane", "skills": ["mud_removal", "drying"], "available": "today", "capacity": 1, "vehicle": false, "professional": null },
+    { "id": "V2", "name": "Tom R.", "area": "Church Street", "skills": ["mud_removal", "debris_removal"], "available": "today", "capacity": 2, "vehicle": true, "professional": null },
+    { "id": "V3", "name": "Priya S.", "area": "High Street", "skills": ["transport", "medication_pickup", "water_food"], "available": "today", "capacity": 2, "vehicle": true, "professional": null },
+    { "id": "V4", "name": "Luis M.", "area": "Park Avenue", "skills": ["transport"], "available": "tomorrow", "capacity": 1, "vehicle": true, "professional": null },
+    { "id": "V5", "name": "Grace O.", "area": "Station Road", "skills": ["drying", "temporary_repair"], "available": "today", "capacity": 1, "vehicle": false, "professional": null },
+    { "id": "V6", "name": "Sam K.", "area": "Bridge Row", "skills": ["power"], "available": "today", "capacity": 2, "vehicle": true, "professional": "electrician" },
+    { "id": "V7", "name": "Helen W.", "area": "Canal Street", "skills": ["temporary_repair"], "available": "today", "capacity": 2, "vehicle": true, "professional": "structural_engineer" },
+    { "id": "V8", "name": "Omar D.", "area": "Riverside primary school", "skills": ["water_food", "shelter"], "available": "today", "capacity": 2, "vehicle": false, "professional": null },
+    { "id": "V9", "name": "Ruth B.", "area": "Ash Grove", "skills": ["debris_removal", "temporary_repair"], "available": "tomorrow", "capacity": 1, "vehicle": false, "professional": null },
+    { "id": "V10", "name": "Jake L.", "area": "Orchard Close", "skills": ["mud_removal", "debris_removal", "drying"], "available": "today", "capacity": 1, "vehicle": false, "professional": null }
+  ],
+  "supplies": [
+    { "item": "shovel_kit", "label": "Shovel and squeegee kit", "stock": 4, "covers": ["mud_removal", "debris_removal"] },
+    { "item": "water_pump", "label": "Water pump", "stock": 1, "covers": ["mud_removal", "drying"] },
+    { "item": "dehumidifier", "label": "Dehumidifier", "stock": 3, "covers": ["drying"] },
+    { "item": "generator", "label": "Portable generator", "stock": 1, "covers": ["power"] },
+    { "item": "tarp", "label": "Tarpaulin", "stock": 6, "covers": ["temporary_repair"] },
+    { "item": "food_parcel", "label": "Food parcel (one household, 2 days)", "stock": 60, "covers": ["water_food"] },
+    { "item": "water_crate", "label": "Drinking water crate (24 × 0.5 l)", "stock": 40, "covers": ["water_food"] },
+    { "item": "camp_bed", "label": "Camp bed at the sports hall", "stock": 12, "covers": ["shelter"] }
+  ]
+}

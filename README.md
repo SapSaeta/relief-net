@@ -240,7 +240,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 27 | Next.js scaffold, video upload, transcription + segmentation pipeline | ✅ |
 | Oct 28 | Structured request with per-frame evidence · evidence verification · agentic grounding · cost ledger | ✅ |
 | Oct 29 | Coordinator dashboard: list, dedupe, priority · provider switch Meta ↔ open weights (Baseten) · typed-message intake · 15-request synthetic scenario | ✅ |
-| Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ⬜ |
+| Oct 30 | Tool calls to match volunteers/resources, explained reasoning | 🟡 rules + roster done (Nov 1), agent next |
 | Oct 31 | Human approval, audit log, safety rules | ⬜ |
 | Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ⬜ |
 | Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | ⬜ |
@@ -353,6 +353,7 @@ relief-net/
 │   ├── llm.ts                   # provider switch: Meta API ↔ Muse Spark Open on Baseten
 │   ├── triage.ts                # coordinator triage call + stored run
 │   ├── triage-rules.ts          # verified duplicates, safety tiers (+ triage-rules.test.ts)
+│   ├── match-rules.ts           # assignment checks: skills, capacity, stock, 112/professionals (+ match-rules.test.ts)
 │   ├── usage.ts · pricing.ts    # per-call tokens, latency and cost ledger + spend counter
 │   ├── guard.ts                 # spend guard: access code, per-IP limit, spend cap
 │   ├── blob.ts                  # private video blobs: download to /tmp, then delete
@@ -365,7 +366,8 @@ relief-net/
 │   ├── PLAN.md                  # 10-day build plan
 │   └── RULES.md                 # hackathon rules summary
 ├── fixtures/
-│   └── riverside-flood.json     # synthetic 15-request scenario + expected triage
+│   ├── riverside-flood.json     # synthetic 15-request scenario + expected triage
+│   └── riverside-resources.json # synthetic roster: 10 volunteers, 8 kinds of supplies
 ├── scripts/
 │   ├── check-meta-api.mjs       # API key + model access check
 │   ├── check-open-weights.mjs   # Muse Spark Open on Baseten: Responses, tools, strict JSON
