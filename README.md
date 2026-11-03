@@ -174,7 +174,23 @@ In the Riverside scenario both real duplicates are now *possible duplicates*: th
 | Tokens in / out | 2,628 / 3,765 | 2,519 / 4,441 |
 | Cost | $0.019 | $0.022 |
 
-One run each on 15 requests (Oct 29, before the location rule); the full comparison with repeated runs and a manual baseline is planned for Nov 2.
+One run each on 15 requests (Oct 29, before the location rule). Repeated runs and a manual baseline follow.
+
+### ⏱️ Model vs a person triaging by hand (measured Nov 2)
+
+The same 15 requests, scored with the same 7 checks (`lib/triage-score.ts`): both real duplicates grouped, both look-alike traps kept apart, the 112 case first, the injection attempt and the "no rush" shed roof in the bottom half. The person used `/baseline`: only the raw requests on screen, a timer, typed positions and a "same as" selector.
+
+| | Checks passed | Duplicates found | False merges | Time to a ranked queue | Cost |
+|---|---:|---:|---:|---:|---:|
+| Muse Spark 1.3 · Meta API (median of 5) | ✅ 7/7 (5 of 5 runs) | 2/2 | 0 | 44.0 s | $0.020 |
+| Muse Spark Open · Baseten (median of 5) | ✅ 7/7 (5 of 5 runs) | 2/2 | 0 | 23.2 s | $0.029 |
+| By hand, one person | ⚠️ 2/7 | 0/2 | 3 | 2.8 min | – |
+
+- The person put the 112 case first and kept the 9 / 11 Church St trap apart, but missed both duplicates (they share a street, not a house number, and one is a video), grouped the video with a look-alike drying request, and left the injection attempt and the shed roof in the top half.
+- Model and person agree only loosely on the rest of the order (Kendall τ 0.20–0.24, 2 of the top 5 shared), so the model's queue is a proposal: the coordinator reviews it, and safety tiers come from code, not from the model.
+- **Limits, stated plainly:** one manual run, by the developer, late at night and quickly; the developer also wrote the scenario. It shows what a hurried first pass looks like, not what a trained coordinator does. The model runs are not saved and do not change the demo data.
+
+[Full results, every run and the manual order](docs/evidence/baseline-comparison.md), reproducible with `node scripts/eval-triage.mjs 5`.
 
 ## 🤝 Volunteer matching with tool calls (working)
 
@@ -338,7 +354,7 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 30 | Tool calls to match volunteers/resources, explained reasoning | ✅ (Nov 1) |
 | Oct 31 | Human approval, audit log, safety rules | ✅ (Nov 1) |
 | Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ✅ intake → triage → matching → approval → report |
-| Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | 🟡 tooling ready (`/baseline`, `scripts/eval-triage.mjs`), manual run next |
+| Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | ✅ both providers 7/7 in 5 of 5 runs (44 s / 23 s); by hand 2/7 in 2.8 min |
 | Nov 3 | Polish, Vercel deploy, demo video | ⬜ |
 | Nov 4 | Submission | ⬜ |
 
