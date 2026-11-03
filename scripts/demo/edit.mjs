@@ -4,12 +4,13 @@
 //   - the narration of each scene starts with the scene (draft voice from tts, or one recorded voice-over file);
 //   - also writes a silent version and the narration script with timecodes for recording a real voice.
 //
-// Usage: node scripts/demo/edit.mjs [--voice=path/to/voice-over.m4a] [--face=path/to/intro-to-camera.mov]
+// Usage: node scripts/demo/edit.mjs [--voice=voice-over.m4a | --voice=private/video/voice] [--face=intro-to-camera.mov]
+//   --voice with a folder (voice.mjs) places <scene>.wav at the start of each scene, the draft voice fills any gap;
 //   --face puts the author's intro to camera first, with a lower third that states the project is personal.
 // Reads private/video/{raw.webm,markers.json,audio/*.aiff}; writes private/video/relief-net-demo*.mp4 and timecodes.md.
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 
 const DIR = 'private/video';
 const CUT_SECONDS = 3;
@@ -64,8 +65,21 @@ const total = mapTime(end);
 const encode = ['-map', `[${last}]`, '-c:v', 'libx264', '-crf', '19', '-preset', 'slow', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
 execFileSync('ffmpeg', ['-v', 'error', '-y', ...videoInputs, '-filter_complex', filters.join(';'), ...encode, '-an', `${DIR}/relief-net-demo-silent.mp4`]);
 
-// Narration: one clip per scene from tts, or a single recorded voice-over from the start.
-const clips = voice ? [{ file: voice, at: 0 }] : m.scenes.map((s) => ({ file: `${DIR}/audio/${s.id}.aiff`, at: mapTime(s.t) + 0.4 }));
+// Narration: one clip per scene (recorded with voice.mjs, else the tts draft), or a single voice-over from the start.
+const duration = (file) => Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]));
+const perScene = voice && statSync(voice).isDirectory();
+const clips =
+  voice && !perScene
+    ? [{ file: voice, at: 0 }]
+    : m.scenes.map((s, i) => {
+        const own = perScene && `${voice}/${s.id}.wav`;
+        const file = own && existsSync(own) ? own : `${DIR}/audio/${s.id}.aiff`;
+        if (perScene && file !== own) console.log(`  ${s.id}: no recording yet, draft voice`);
+        const at = mapTime(s.t) + 0.4;
+        const room = (m.scenes[i + 1] ? mapTime(m.scenes[i + 1].t) : total) - at;
+        if (duration(file) > room) console.log(`  ⚠️ ${s.id}: ${duration(file).toFixed(1)} s of voice for ${room.toFixed(1)} s of scene`);
+        return { file, at };
+      });
 const audioInputs = clips.flatMap((c) => ['-i', c.file]);
 const delays = clips.map((c, i) => `[${i + 1}:a]adelay=${Math.round(c.at * 1000)}:all=1[a${i}]`);
 const mix = `${clips.map((_, i) => `[a${i}]`).join('')}amix=inputs=${clips.length}:normalize=0,apad,atrim=0:${total.toFixed(2)}[aout]`;
