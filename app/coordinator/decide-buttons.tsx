@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { recallAccessCode, rememberAccessCode } from "./access-code";
+import { fetchWithCode } from "@/app/access-code";
 
 /** Approve (dispatch) or reject one proposed assignment. Needs the demo access code; no model call. */
 export function DecideButtons({ caseId }: { caseId: string }) {
@@ -15,17 +15,14 @@ export function DecideButtons({ caseId }: { caseId: string }) {
   async function decide(action: "approve" | "reject") {
     const note = action === "reject" ? window.prompt("Why reject? (optional, goes to the audit log)") : "";
     if (note === null) return; // cancelled
-    const code = recallAccessCode() || window.prompt("Demo access code") || "";
     setBusy(action);
     setError(null);
     try {
-      const res = await fetch("/api/match/decide", {
+      await fetchWithCode("/api/match/decide", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-access-code": code.trim() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ caseId, action, note }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? `Failed (${res.status})`);
-      rememberAccessCode(code.trim());
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");

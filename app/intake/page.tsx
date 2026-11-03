@@ -1,7 +1,7 @@
 import { ReviewBanner } from "@/app/review-banner";
 import { blobUploadsEnabled } from "@/lib/blob";
 
-import { IntakeForm, MessageForm } from "./intake-form";
+import { IntakeTabs } from "./intake-form";
 
 export const metadata = { title: "Intake · relief-net" };
 
@@ -11,19 +11,15 @@ export default function IntakePage() {
       <header className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">Report damage</h1>
         <p className="text-foreground/70">
-          Record a short walkthrough of the damage and describe it out loud. We transcribe what you say and mark the
-          visible damage on each frame.
+          Show us the damage in a short video and describe it out loud, or type a message. We turn it into a help request
+          that a local coordinator reviews before sending volunteers or supplies.
         </p>
-        <p className="text-sm text-foreground/50">
-          Life-threatening emergency? Call <strong>112</strong>. Do not enter buildings that may be structurally unsafe.
+        <p className="rounded-lg border border-red-600/40 bg-red-600/5 px-4 py-2 text-sm">
+          <strong>Life-threatening emergency? Call 112.</strong> Do not enter buildings that may be structurally unsafe.
         </p>
       </header>
       <ReviewBanner />
-      <IntakeForm uploadMode={blobUploadsEnabled() ? "blob" : "multipart"} />
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">No video? Type your request</h2>
-        <MessageForm />
-      </section>
+      <IntakeTabs uploadMode={blobUploadsEnabled() ? "blob" : "multipart"} />
     </main>
   );
 }

@@ -1,7 +1,10 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { accessCode, AccessCodeError, fetchWithCode, rememberAccessCode } from "@/app/access-code";
 
 import type { IntakeCase } from "@/lib/cases";
 
@@ -25,10 +28,11 @@ type State = { status: "idle" } | { status: "running"; startedAt: number } | { s
 
 /** Production uploads the video to Vercel Blob first (request bodies there are capped at ~4.5 MB);
  *  local development posts it to /api/intake as multipart. */
-async function sendVideo(form: FormData, mode: "blob" | "multipart", accessCode: string): Promise<Response> {
-  form.delete("accessCode");
-  if (mode === "multipart") return fetch("/api/intake", { method: "POST", body: form, headers: { "x-access-code": accessCode } });
+async function sendVideo(form: FormData, mode: "blob" | "multipart"): Promise<Response> {
+  if (mode === "multipart") return fetchWithCode("/api/intake", { method: "POST", body: form });
 
+  const code = accessCode();
+  if (code === null) throw new AccessCodeError("Sending a report needs the demo access code.");
   const video = form.get("video") as File;
   const extension = video.type === "video/quicktime" ? "mov" : "mp4";
   // The Blob client hides the server's answer ("Failed to retrieve the client token"); the usual cause is the code.
@@ -36,128 +40,216 @@ async function sendVideo(form: FormData, mode: "blob" | "multipart", accessCode:
     access: "private",
     contentType: video.type,
     handleUploadUrl: "/api/intake/upload",
-    headers: { "x-access-code": accessCode },
+    headers: { "x-access-code": code },
     multipart: video.size > 20 * 1024 * 1024,
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : "";
-    throw new Error(/client token/i.test(message) ? "Upload not authorized: check the demo access code." : message || "Upload failed");
+    if (!/client token/i.test(message)) throw new Error(message || "Upload failed");
+    rememberAccessCode("");
+    throw new AccessCodeError("Upload not authorized: check the demo access code and try again.");
   });
-  return fetch("/api/intake", {
+  return fetchWithCode("/api/intake", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-access-code": accessCode },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ blobPathname: blob.pathname, location: form.get("location") }),
   });
 }
 
-export function IntakeForm({ uploadMode = "multipart" }: { uploadMode?: "blob" | "multipart" }) {
+const VIDEO_STEPS = [
+  "Upload the video",
+  "Transcribe what you say (Muse Voice Transcribe)",
+  "Mark the damage on key frames (SAM 3.1)",
+  "Draft the help request (Muse Spark)",
+  "Check every quote and frame it cites",
+];
+const MESSAGE_STEPS = ["Draft the help request (Muse Spark)", "Check every quote it cites"];
+
+const inputClass = "w-full rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm";
+const buttonClass = "rounded-md bg-foreground px-4 py-2.5 text-sm font-medium text-background disabled:opacity-50";
+
+/** The two ways to ask for help, as tabs: a narrated video walkthrough, or a typed message. */
+export function IntakeTabs({ uploadMode = "multipart" }: { uploadMode?: "blob" | "multipart" }) {
+  const [tab, setTab] = useState<"video" | "message">("video");
   const [state, setState] = useState<State>({ status: "idle" });
+  const running = state.status === "running";
 
   async function submit(form: FormData) {
     setState({ status: "running", startedAt: Date.now() });
     try {
-      const res = await sendVideo(form, uploadMode, String(form.get("accessCode") ?? "").trim());
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
-      setState({ status: "done", intake: json });
+      const res =
+        tab === "video"
+          ? await sendVideo(form, uploadMode)
+          : await fetchWithCode("/api/intake/message", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: form.get("message"), location: form.get("location") }),
+            });
+      setState({ status: "done", intake: await res.json() });
     } catch (error) {
-      setState({ status: "error", message: error instanceof Error ? error.message : "Upload failed" });
+      setState({ status: "error", message: error instanceof Error ? error.message : "Sending failed" });
     }
   }
 
+  if (state.status === "done") return <Submitted intake={state.intake} onAnother={() => setState({ status: "idle" })} />;
+
   return (
-    <div className="flex flex-col gap-8">
-      <form action={submit} className="flex flex-col gap-3 rounded-xl border border-foreground/15 p-5 sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-4">
+      <div role="tablist" className="flex gap-1 rounded-lg bg-foreground/5 p-1 text-sm sm:w-fit">
+        {(
+          [
+            ["video", "🎥 Record a video"],
+            ["message", "💬 Type a message"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={tab === value}
+            disabled={running}
+            onClick={() => setTab(value)}
+            className="flex-1 rounded-md px-4 py-2 font-medium text-foreground/60 aria-selected:bg-background aria-selected:text-foreground aria-selected:shadow-sm sm:flex-none"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <form action={submit} className="flex flex-col gap-5 rounded-xl border border-foreground/15 p-5">
+        {tab === "video" ? <VideoFields disabled={running} /> : <MessageFields disabled={running} />}
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium">Address or area</span>
+          <input name="location" disabled={running} placeholder="e.g. 4 Mill Lane, Riverside" className={inputClass} />
+          <span className="text-xs text-foreground/50">Helps the coordinator spot two reports about the same home.</span>
+        </label>
+        <button type="submit" disabled={running} className={buttonClass}>
+          {running ? "Working…" : tab === "video" ? "Send video for analysis" : "Send message"}
+        </button>
+        {state.status === "running" && <Progress steps={tab === "video" ? VIDEO_STEPS : MESSAGE_STEPS} startedAt={state.startedAt} />}
+        {state.status === "error" && (
+          <p role="alert" className="rounded-lg border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+            {state.message}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+function VideoFields({ disabled }: { disabled: boolean }) {
+  const [file, setFile] = useState<File | null>(null);
+  return (
+    <div className="grid gap-5 sm:grid-cols-2">
+      <label
+        className={`flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-6 text-center text-sm ${
+          file ? "border-green-600/50 bg-green-600/5" : "border-foreground/20 hover:border-foreground/40"
+        }`}
+      >
         <input
           name="video"
           type="file"
           accept="video/mp4,video/quicktime"
           capture="environment"
           required
-          className="flex-1 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-foreground/10 file:px-3 file:py-2"
+          disabled={disabled}
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          className="sr-only"
         />
-        <input
-          name="location"
-          placeholder="Address or area"
-          className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm sm:w-48"
-        />
-        <input
-          name="accessCode"
-          type="password"
-          placeholder="Demo access code"
-          autoComplete="off"
-          className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm sm:w-44"
-        />
-        <button
-          type="submit"
-          disabled={state.status === "running"}
-          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
-        >
-          {state.status === "running" ? "Analyzing…" : "Analyze walkthrough"}
-        </button>
-      </form>
-
-      {state.status === "running" && (
-        <p className="text-sm text-foreground/60">Uploading, transcribing, segmenting damage and drafting the help request. This takes under a minute.</p>
-      )}
-      {state.status === "error" && <p className="text-sm text-red-600">{state.message}</p>}
-      {state.status === "done" && <IntakeResult intake={state.intake} />}
+        {file ? (
+          <>
+            <span className="text-2xl">✓</span>
+            <span className="font-medium break-all">{file.name}</span>
+            <span className="text-xs text-foreground/60">{(file.size / 1024 / 1024).toFixed(1)} MB · click to change</span>
+          </>
+        ) : (
+          <>
+            <span className="text-2xl">🎥</span>
+            <span className="font-medium">Record or choose a video</span>
+            <span className="text-xs text-foreground/60">MP4 or MOV, up to 200 MB</span>
+          </>
+        )}
+      </label>
+      <div className="flex flex-col gap-2 text-sm">
+        <p className="font-medium">For a useful walkthrough</p>
+        <ul className="flex list-disc flex-col gap-1 pl-5 text-foreground/70">
+          <li>Walk room by room, 30 to 90 seconds.</li>
+          <li>Say what happened, who lives there (children, older or disabled people) and what help you need.</li>
+          <li>Point the camera at each damaged thing while you name it.</li>
+          <li>If a room may be unsafe, film from the doorway. Do not go in.</li>
+        </ul>
+      </div>
     </div>
   );
 }
 
-type MessageState = { status: "idle" } | { status: "running" } | { status: "done"; intake: IntakeCase } | { status: "error"; message: string };
+function MessageFields({ disabled }: { disabled: boolean }) {
+  return (
+    <label className="flex flex-col gap-1.5 text-sm">
+      <span className="font-medium">What happened, who lives there and what help you need</span>
+      <textarea
+        name="message"
+        required
+        disabled={disabled}
+        rows={5}
+        maxLength={2000}
+        placeholder="e.g. Water came into the ground floor last night. My mother (82) lives alone and cannot use the stairs. We have no power and need help drying the house."
+        className={inputClass}
+      />
+      <span className="text-xs text-foreground/50">No video needed: for when there is no data, no battery or it is not safe to film.</span>
+    </label>
+  );
+}
 
-/** No video (no data, no battery, can't film): the same help request from a typed message. */
-export function MessageForm() {
-  const [state, setState] = useState<MessageState>({ status: "idle" });
+/** What the pipeline does, with the time elapsed. The server answers once at the end, so steps are listed, not tracked. */
+function Progress({ steps, startedAt }: { steps: string[]; startedAt: number }) {
+  const [now, setNow] = useState(startedAt);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div aria-live="polite" className="flex flex-col gap-2 rounded-lg bg-foreground/5 px-4 py-3 text-sm">
+      <p className="flex items-center gap-2 font-medium">
+        <span className="size-3 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
+        Working on it · {Math.round((now - startedAt) / 1000)} s
+        <span className="font-normal text-foreground/50">(usually under a minute)</span>
+      </p>
+      <ol className="flex list-decimal flex-col gap-0.5 pl-9 text-foreground/70">
+        {steps.map((s) => (
+          <li key={s}>{s}</li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
-  async function submit(form: FormData) {
-    setState({ status: "running" });
-    try {
-      const res = await fetch("/api/intake/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-access-code": String(form.get("accessCode") ?? "").trim() },
-        body: JSON.stringify({ message: form.get("message"), location: form.get("location") }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
-      setState({ status: "done", intake: json });
-    } catch (error) {
-      setState({ status: "error", message: error instanceof Error ? error.message : "Sending failed" });
-    }
-  }
-
+function Submitted({ intake, onAnother }: { intake: IntakeCase; onAnother: () => void }) {
+  const urgent = intake.request?.safety_flags.some((f) => f.flag === "call_112_now");
   return (
     <div className="flex flex-col gap-6">
-      <form action={submit} className="flex flex-col gap-3 rounded-xl border border-foreground/15 p-5">
-        <textarea
-          name="message"
-          required
-          rows={3}
-          maxLength={2000}
-          placeholder="What happened, who lives there and what help you need"
-          className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm"
-        />
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <input name="location" placeholder="Address or area" className="flex-1 rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm" />
-          <input
-            name="accessCode"
-            type="password"
-            placeholder="Demo access code"
-            autoComplete="off"
-            className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm sm:w-44"
-          />
-          <button
-            type="submit"
-            disabled={state.status === "running"}
-            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
-          >
-            {state.status === "running" ? "Sending…" : "Send message"}
+      <div className={`flex flex-col gap-3 rounded-xl border p-5 ${urgent ? "border-red-600 bg-red-600/10" : "border-green-600/50 bg-green-600/5"}`}>
+        {urgent && (
+          <p className="text-lg font-semibold text-red-700 dark:text-red-300">
+            This sounds life-threatening: call 112 now. Volunteers are not sent to emergencies.
+          </p>
+        )}
+        <p className="font-medium">
+          {intake.request ? "✓ Your help request is in the coordinator's queue." : "Your report was saved, but the help request could not be drafted."}
+        </p>
+        <p className="text-sm text-foreground/70">
+          A person reviews it before anyone is sent. Below is what we understood: check it, and add anything missing in a new
+          message.
+        </p>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Link href={`/cases/${intake.id}`} className="rounded-md bg-foreground px-4 py-2 font-medium text-background">
+            Open your case
+          </Link>
+          <button type="button" onClick={onAnother} className="rounded-md border border-foreground/20 px-4 py-2 font-medium">
+            Send another report
           </button>
         </div>
-      </form>
-      {state.status === "error" && <p className="text-sm text-red-600">{state.message}</p>}
-      {state.status === "done" && <IntakeResult intake={state.intake} />}
+      </div>
+      <IntakeResult intake={intake} />
     </div>
   );
 }

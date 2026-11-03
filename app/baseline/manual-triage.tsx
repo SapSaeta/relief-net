@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { recallAccessCode, rememberAccessCode } from "@/app/coordinator/access-code";
+import { fetchWithCode } from "@/app/access-code";
 
 export type BaselineRequest = { id: string; label: string; receivedAt: string; source: string; location: string; words: string };
 
@@ -49,15 +49,12 @@ export function ManualTriage({ requests }: { requests: BaselineRequest[] }) {
 
   async function finish(startedAt: number) {
     const durationMs = Date.now() - startedAt;
-    const code = (recallAccessCode() || window.prompt("Demo access code") || "").trim();
     try {
-      const res = await fetch("/api/baseline", {
+      await fetchWithCode("/api/baseline", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-access-code": code },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ triager, startedAt: new Date(startedAt).toISOString(), durationMs, order, duplicates: groups() }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? `Failed (${res.status})`);
-      rememberAccessCode(code);
       setPhase({ name: "saved", durationMs });
     } catch (e) {
       setPhase({ name: "error", message: e instanceof Error ? e.message : "Failed", startedAt });

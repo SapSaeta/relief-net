@@ -393,7 +393,7 @@ The home page is a guided walkthrough: six steps, each linking to a live page of
 | `/cases/[id]`: help request, evidence chips, SAM masks, transcript | Confirm or undo a merge |
 | `/api/usage`: running cost | Submit a video or typed message on `/intake` |
 
-**How judges get the code:** it is given privately in the hackathon submission's testing-instructions field, never in this repository, the video or a screenshot. It is a random demo-only value (`DEMO_ACCESS_CODE`), rotated after judging, and the spend cap (`SPEND_CAP_USD`) bounds what any code holder can spend. Surrounding spaces are ignored; a wrong code on a video upload shows *“Upload not authorized: check the demo access code.”*
+**How judges get the code:** it is given privately in the hackathon submission's testing-instructions field, never in this repository, the video or a screenshot. It is a random demo-only value (`DEMO_ACCESS_CODE`), rotated after judging, and the spend cap (`SPEND_CAP_USD`) bounds what any code holder can spend. The code is entered once per browser tab, with **Enter demo code** in the header or at the first action that needs it, and kept only in that tab's session storage. Surrounding spaces are ignored; a rejected code is forgotten so the next action asks again, and a wrong code on a video upload shows *“Upload not authorized: check the demo access code and try again.”*
 
 ## 🛡️ Safety by design
 
@@ -463,7 +463,8 @@ relief-net/
 │   ├── cases/[id]/report/       # printable insurance/aid draft report
 │   ├── coordinator/             # triage queue, merged duplicates, matching panel + agent trace, provider switch
 │   ├── review-banner.tsx        # review mode notice (read open, actions need the code)
-│   ├── intake/                  # intake page: upload, help request card, mask overlays
+│   ├── intake/                  # intake page: video or message tabs, recording tips, progress, help request card, mask overlays
+│   ├── access-code.ts           # demo code kept once per tab; fetch wrapper that forgets a rejected code
 │   ├── site-nav.tsx             # header on every page (hidden when printing)
 │   ├── layout.tsx
 │   └── page.tsx                 # guided walkthrough: six steps linked to live pages + measured results

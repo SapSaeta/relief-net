@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { rememberAccessCode } from "./access-code";
+import { fetchWithCode } from "@/app/access-code";
 
 const OPTIONS = [
   { value: "baseten", label: "Muse Spark Open · Baseten (open weights)" },
@@ -33,13 +33,11 @@ export function TriageControls({
     setRunning(true);
     setError(null);
     try {
-      const res = await fetch(endpoint, {
+      await fetchWithCode(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-access-code": String(form.get("accessCode") ?? "") },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider: form.get("provider") }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? `Request failed (${res.status})`);
-      rememberAccessCode(String(form.get("accessCode") ?? ""));
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
@@ -63,13 +61,6 @@ export function TriageControls({
             </option>
           ))}
         </select>
-        <input
-          name="accessCode"
-          type="password"
-          placeholder="Demo access code"
-          autoComplete="off"
-          className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm sm:w-44"
-        />
         <button
           type="submit"
           disabled={running}

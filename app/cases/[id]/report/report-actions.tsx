@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { recallAccessCode, rememberAccessCode } from "@/app/coordinator/access-code";
+import { fetchWithCode } from "@/app/access-code";
 
 /** Draft (or redraft) the report, and print it. Drafting needs the demo access code (one model call). */
 export function ReportActions({ caseId, hasReport }: { caseId: string; hasReport: boolean }) {
@@ -13,13 +13,10 @@ export function ReportActions({ caseId, hasReport }: { caseId: string; hasReport
   const [, startTransition] = useTransition();
 
   async function draft() {
-    const code = (recallAccessCode() || window.prompt("Demo access code") || "").trim();
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/cases/${caseId}/report`, { method: "POST", headers: { "x-access-code": code } });
-      if (!res.ok) throw new Error((await res.json()).error ?? `Failed (${res.status})`);
-      rememberAccessCode(code);
+      await fetchWithCode(`/api/cases/${caseId}/report`, { method: "POST" });
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");

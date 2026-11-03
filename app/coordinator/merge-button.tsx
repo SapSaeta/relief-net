@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { recallAccessCode, rememberAccessCode } from "./access-code";
+import { fetchWithCode } from "@/app/access-code";
 
 /** Confirm or undo a proposed duplicate merge. Needs the demo access code; no model call. */
 export function MergeButton({ groupKey, action }: { groupKey: string; action: "confirm" | "undo" }) {
@@ -13,17 +13,14 @@ export function MergeButton({ groupKey, action }: { groupKey: string; action: "c
   const [, startTransition] = useTransition();
 
   async function decide() {
-    const code = recallAccessCode() || window.prompt("Demo access code") || "";
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/triage/merge", {
+      await fetchWithCode("/api/triage/merge", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-access-code": code },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: groupKey, action }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? `Failed (${res.status})`);
-      rememberAccessCode(code);
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");
