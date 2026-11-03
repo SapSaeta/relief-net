@@ -171,6 +171,10 @@ export async function loadReport(caseId: string): Promise<CaseReport | null> {
   return store().getDoc<CaseReport>(REPORTS, caseId);
 }
 
+export async function listReports(): Promise<CaseReport[]> {
+  return store().listDocs<CaseReport>(REPORTS);
+}
+
 /** Help already dispatched for this case, from the coordinator's approvals (not from the model). */
 export async function dispatchedHelp(caseId: string): Promise<{ at?: string; team: string[]; supplies: string[] } | null> {
   const run = await loadMatching();

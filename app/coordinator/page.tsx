@@ -272,7 +272,7 @@ const supplyLabel = (item: string) => roster.supplies.find((s) => s.item === ite
 function MatchingPanel({ run, current }: { run: MatchRun | null; current: boolean }) {
   const left = remaining(roster, current && run ? run.assignments.filter((a) => a.status !== "rejected") : []);
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-foreground/15 p-5">
+    <section id="matching" className="scroll-mt-6 flex flex-col gap-4 rounded-xl border border-foreground/15 p-5">
       <div>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/60">Volunteers and supplies</h2>
         <p className="mt-1 text-xs text-foreground/60">

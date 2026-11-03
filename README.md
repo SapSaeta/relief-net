@@ -17,7 +17,7 @@ From a phone video of a damaged home to a prioritized, evidence-backed help requ
 ![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)
 ![Data](https://img.shields.io/badge/data-100%25_synthetic-2EA44F?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
-![Status](https://img.shields.io/badge/status-day_3_·_coordinator_triage-F2A900?style=flat-square)
+![Status](https://img.shields.io/badge/status-end--to--end_·_measured-2EA44F?style=flat-square)
 
 </div>
 
@@ -381,6 +381,10 @@ gantt
 
 The [live demo](https://relief-net-one.vercel.app) opens in **review mode**: a pre-seeded, fully synthetic scenario (the Riverside flood: 1 video walkthrough + 14 typed messages) that anyone can read, while everything that costs money or changes a decision needs the demo access code.
 
+The home page is a guided walkthrough: six steps, each linking to a live page of the scenario (a sample case, the coordinator queue, the matching panel, a sample report, the audit log), plus the measured results. A header on every page links the main views.
+
+![Home page: six-step walkthrough of the scenario and the measured results](docs/assets/home-walkthrough.jpg)
+
 | Without the code (anyone with the URL) | With the code |
 |---|---|
 | `/coordinator`: triage queue, reasons, duplicates, safety-rule overrides, proposed assignments + agent trace | Run triage or matching on Meta or open weights |
@@ -460,8 +464,9 @@ relief-net/
 │   ├── coordinator/             # triage queue, merged duplicates, matching panel + agent trace, provider switch
 │   ├── review-banner.tsx        # review mode notice (read open, actions need the code)
 │   ├── intake/                  # intake page: upload, help request card, mask overlays
+│   ├── site-nav.tsx             # header on every page (hidden when printing)
 │   ├── layout.tsx
-│   └── page.tsx                 # landing page
+│   └── page.tsx                 # guided walkthrough: six steps linked to live pages + measured results
 ├── lib/
 │   ├── meta.ts                  # server-only Meta Model API client (Responses API)
 │   ├── media.ts                 # ffmpeg: MP4 faststart, WAV 24 kHz, key frames
