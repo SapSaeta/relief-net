@@ -22,12 +22,31 @@ export default function CoordinatorPage() {
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-12">
       <header className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">Coordinator</h1>
-        <p className="text-foreground/70">
-          Muse Spark proposes duplicates and an order with reasons. Code merges a duplicate on its own only when each request is
-          backed by its own words and the locations match; otherwise you confirm it. Safety tiers stay in place: 112 first, then
-          critical, high, medium, low. A matching agent then proposes volunteers and supplies with tool calls, each proposal
-          checked by code. You decide what happens next.
-        </p>
+        <p className="text-foreground/70">Every open help request, most urgent first. The AI proposes; you decide.</p>
+        <details className="text-sm text-foreground/70">
+          <summary className="w-fit cursor-pointer font-medium text-foreground">How this view works</summary>
+          <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5">
+            <li>
+              <strong>Triage:</strong> Muse Spark orders the requests and spots duplicates, with a reason for each. Safety tiers come
+              from code, not the model: 112 first, then critical, high, medium, low.
+            </li>
+            <li>
+              <strong>Duplicates:</strong> merged on their own only when each request&apos;s own words back it and the locations
+              match; otherwise you confirm.
+            </li>
+            <li>
+              <strong>Matching:</strong> an agent proposes volunteers and supplies with tool calls; code checks skills, stock and
+              safety (no volunteers to a 112 case, professionals on hazardous sites).
+            </li>
+            <li>
+              <strong>You:</strong> approve or reject each assignment. Nothing is dispatched without you, and every step is in the{" "}
+              <Link href="/audit" className="underline underline-offset-2">
+                audit log
+              </Link>
+              . R1, R2… are the request labels the AI used.
+            </li>
+          </ol>
+        </details>
       </header>
       <ReviewBanner />
       <Suspense fallback={<p className="text-sm text-foreground/60">Loading requests…</p>}>
@@ -57,10 +76,26 @@ async function Dashboard() {
   const fresh = triage ? open.filter((c) => !triage.caseIds.includes(c.id)) : open;
   const queue = triage?.queue.filter((q) => byId.has(q.caseId)) ?? [];
   const match = matching && triage && matching.triageId === triage.id ? matching : null;
+  const refOf = new Map(triage?.inputs.map((i) => [i.caseId, i.ref]) ?? []);
+  const possible = triage?.duplicates.filter((d) => d.status === "possible") ?? [];
+  const pending = queue.filter((q) => match?.assignments.some((a) => a.caseId === q.caseId && a.status === "proposed"));
+  const flagged = queue.filter((q) => match?.flags.some((f) => f.caseId === q.caseId));
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="flex flex-col gap-4 rounded-xl border border-foreground/15 p-5">
+      {triage && (
+        <NextActions
+          items={[
+            fresh.length > 0 && { text: `${fresh.length} new request${fresh.length === 1 ? "" : "s"} not triaged yet: run triage again`, href: "#top" },
+            possible.length > 0 && { text: `${possible.length} possible duplicate${possible.length === 1 ? "" : "s"} to confirm`, href: "#duplicates" },
+            flagged.length > 0 && { text: `${flagged.length} request${flagged.length === 1 ? "" : "s"} flagged for you by the agent`, href: `#case-${flagged[0].caseId}` },
+            pending.length > 0 && { text: `${pending.length} assignment${pending.length === 1 ? "" : "s"} waiting for your approval`, href: `#case-${pending[0].caseId}` },
+            !match && { text: "No volunteers proposed yet: run matching", href: "#matching" },
+          ]}
+        />
+      )}
+
+      <section id="top" className="flex scroll-mt-6 flex-col gap-4 rounded-xl border border-foreground/15 p-5">
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
           <Stat label="Open requests" value={open.length} />
           {triage && <Stat label="In queue" value={queue.length} />}
@@ -79,7 +114,7 @@ async function Dashboard() {
       )}
 
       {triage && triage.duplicates.some((d) => d.status === "possible") && (
-        <section className="flex flex-col gap-3 rounded-xl border border-orange-500/50 p-5">
+        <section id="duplicates" className="flex scroll-mt-6 flex-col gap-3 rounded-xl border border-orange-500/50 p-5">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/60">Possible duplicates to confirm</h2>
             <p className="mt-1 text-xs text-foreground/60">
@@ -92,7 +127,7 @@ async function Dashboard() {
               .map((d) => (
                 <li key={d.key} className="flex flex-col gap-1.5 rounded-lg bg-foreground/5 px-3 py-2 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{d.caseIds.map((id) => byId.get(id)?.location ?? "location unknown").join("  +  ")}</span>
+                    <span className="font-medium">{d.caseIds.map((id) => `${refOf.get(id) ?? ""} ${byId.get(id)?.location ?? "location unknown"}`.trim()).join("  +  ")}</span>
                     <span className="ml-auto">
                       <MergeButton groupKey={d.key} action="confirm" />
                     </span>
@@ -114,6 +149,7 @@ async function Dashboard() {
             <QueueCard
               key={item.caseId}
               item={item}
+              refLabel={refOf.get(item.caseId)}
               intake={byId.get(item.caseId)!}
               byId={byId}
               group={triage.duplicates.find((d) => d.status === "merged" && d.keepId === item.caseId)}
@@ -131,6 +167,26 @@ async function Dashboard() {
         </ul>
       )}
     </div>
+  );
+}
+
+function NextActions({ items }: { items: (false | { text: string; href: string })[] }) {
+  const todo = items.filter((i) => i !== false);
+  return (
+    <section className="flex flex-col gap-2 rounded-xl border border-foreground/15 bg-foreground/5 p-4 text-sm">
+      <h2 className="font-semibold">{todo.length ? "What needs you now" : "✓ Nothing waiting for you"}</h2>
+      {todo.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {todo.map((i) => (
+            <li key={i.text}>
+              <a href={i.href} className="underline underline-offset-2 hover:text-foreground/70">
+                → {i.text}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -189,12 +245,14 @@ function CaseLine({ intake }: { intake: OpenCase }) {
 
 function QueueCard({
   item,
+  refLabel,
   intake,
   byId,
   group,
   match,
 }: {
   item: QueueItem;
+  refLabel?: string;
   intake: OpenCase;
   byId: Map<string, OpenCase>;
   group?: DuplicateGroup;
@@ -203,10 +261,20 @@ function QueueCard({
   const assignment = match?.assignments.find((a) => a.caseId === item.caseId);
   const flag = match?.flags.find((f) => f.caseId === item.caseId);
   return (
-    <li className={`flex gap-4 rounded-xl border p-4 text-sm ${item.tier === 0 ? "border-red-600" : "border-foreground/15"}`}>
-      <div className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+    <li
+      id={`case-${item.caseId}`}
+      className={`flex scroll-mt-6 gap-4 rounded-xl border p-4 text-sm ${item.tier === 0 ? "border-red-600" : "border-foreground/15"}`}
+    >
+      <div className="flex w-14 shrink-0 flex-col items-center gap-1.5">
         <span className="text-2xl font-semibold tabular-nums">{item.rank}</span>
-        <span className={`rounded px-1.5 py-0.5 text-center text-[11px] font-medium ${TIER_STYLES[item.tier]}`}>{TIER_LABELS[item.tier]}</span>
+        {refLabel && (
+          <span title="Label the AI used for this request" className="font-mono text-xs text-foreground/50">
+            {refLabel}
+          </span>
+        )}
+        {TIER_LABELS[item.tier].toLowerCase() !== intake.request.priority && (
+          <span className={`rounded px-1.5 py-0.5 text-center text-[11px] font-medium ${TIER_STYLES[item.tier]}`}>{TIER_LABELS[item.tier]}</span>
+        )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <CaseLine intake={intake} />

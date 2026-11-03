@@ -461,7 +461,7 @@ relief-net/
 │   ├── api/usage/route.ts       # GET running usage and cost totals
 │   ├── cases/[id]/page.tsx      # view a stored case
 │   ├── cases/[id]/report/       # printable insurance/aid draft report
-│   ├── coordinator/             # triage queue, merged duplicates, matching panel + agent trace, provider switch
+│   ├── coordinator/             # "what needs you now", triage queue with R-labels, duplicates, matching panel + agent trace, provider switch
 │   ├── review-banner.tsx        # review mode notice (read open, actions need the code)
 │   ├── intake/                  # intake page: video or message tabs, recording tips, progress, help request card, mask overlays
 │   ├── access-code.ts           # demo code kept once per tab; fetch wrapper that forgets a rejected code

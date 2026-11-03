@@ -278,6 +278,15 @@ export function IntakeResult({ intake }: { intake: IntakeCase }) {
         </span>
       </section>
 
+      {intake.request ? (
+        <HelpRequestCard request={intake.request} />
+      ) : (
+        <p className="rounded-xl border border-orange-500/50 p-5 text-sm">
+          The help request could not be drafted ({intake.requestError ?? "unknown error"}). The transcript and damage evidence below were
+          saved.
+        </p>
+      )}
+
       {intake.proposals && intake.proposals.length > 0 && (
         <section className="rounded-xl border border-foreground/15 p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">Extra damage proposed by Muse Spark</h2>
@@ -302,15 +311,6 @@ export function IntakeResult({ intake }: { intake: IntakeCase }) {
             ))}
           </ul>
         </section>
-      )}
-
-      {intake.request ? (
-        <HelpRequestCard request={intake.request} />
-      ) : (
-        <p className="rounded-xl border border-orange-500/50 p-5 text-sm">
-          The help request could not be drafted ({intake.requestError ?? "unknown error"}). The transcript and damage evidence below were
-          saved.
-        </p>
       )}
 
       <section className="rounded-xl border border-foreground/15 p-5">
