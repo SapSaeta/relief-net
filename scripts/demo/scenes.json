@@ -1,8 +1,8 @@
 [
   {
     "id": "intro",
-    "title": "The problem",
-    "text": "After a flood, hundreds of homes ask for help at once. Volunteer coordinators get videos, messages and duplicates, and must decide who goes where, fast. relief-net is an AI coordination layer built on Meta's models, with a person approving every dispatch."
+    "title": "relief-net",
+    "text": "relief-net is an AI coordination layer for disaster response, built on Meta's models. It turns videos and messages from affected households into verified help requests, and a person approves every dispatch."
   },
   {
     "id": "home",

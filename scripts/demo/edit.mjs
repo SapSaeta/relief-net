@@ -4,7 +4,8 @@
 //   - the narration of each scene starts with the scene (draft voice from tts, or one recorded voice-over file);
 //   - also writes a silent version and the narration script with timecodes for recording a real voice.
 //
-// Usage: node scripts/demo/edit.mjs [--voice=path/to/voice-over.m4a]
+// Usage: node scripts/demo/edit.mjs [--voice=path/to/voice-over.m4a] [--face=path/to/intro-to-camera.mov]
+//   --face puts the author's intro to camera first, with a lower third that states the project is personal.
 // Reads private/video/{raw.webm,markers.json,audio/*.aiff}; writes private/video/relief-net-demo*.mp4 and timecodes.md.
 
 import { execFileSync } from 'node:child_process';
@@ -12,7 +13,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const DIR = 'private/video';
 const CUT_SECONDS = 3;
-const voice = process.argv.find((a) => a.startsWith('--voice='))?.slice(8);
+const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+const voice = arg('voice');
+const face = arg('face');
 const m = JSON.parse(readFileSync(`${DIR}/markers.json`, 'utf8'));
 const end = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', `${DIR}/raw.webm`]));
 
@@ -68,11 +71,33 @@ const delays = clips.map((c, i) => `[${i + 1}:a]adelay=${Math.round(c.at * 1000)
 const mix = `${clips.map((_, i) => `[a${i}]`).join('')}amix=inputs=${clips.length}:normalize=0,apad,atrim=0:${total.toFixed(2)}[aout]`;
 execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', `${DIR}/relief-net-demo-silent.mp4`, ...audioInputs, '-filter_complex', [...delays, mix].join(';'), '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', `${DIR}/relief-net-demo.mp4`]);
 
+// Intro to camera: same frame size, a lower third, then the screen recording.
+let offset = 0;
+if (face) {
+  const lower = `<html style="background:transparent"><body style="margin:0;background:transparent;font-family:-apple-system,Helvetica,sans-serif">
+    <div style="display:inline-block;margin:8px;padding:16px 26px;border-radius:14px;background:rgba(0,0,0,.78);color:#fff;border:1px solid rgba(255,255,255,.25)">
+    <div style="font-size:34px;font-weight:600">Javier · built relief-net solo for the Indie track</div>
+    <div style="font-size:24px;color:#cfcfcf;margin-top:6px">Personal project, not affiliated with the UME or any employer</div></div></body></html>`;
+  writeFileSync(`${DIR}/lower-third.html`, lower);
+  execFileSync(chrome, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--default-background-color=00000000', '--window-size=1000,140', `--screenshot=${DIR}/lower-third.png`, `file://${process.cwd()}/${DIR}/lower-third.html`], { stdio: 'ignore' });
+  offset = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', face]));
+  const faceFilter = [
+    `[0:v]scale=1440:900:force_original_aspect_ratio=increase,crop=1440:900,fps=30,setsar=1[f]`,
+    `[f][1:v]overlay=x=48:y=H-h-48:enable='between(t,0.5,${Math.max(1, offset - 0.5).toFixed(2)})'[fv]`,
+    `[0:a]aresample=48000,aformat=channel_layouts=stereo[fa]`,
+    `[2:v]fps=30,setsar=1[mv]`,
+    `[2:a]aresample=48000,aformat=channel_layouts=stereo[ma]`,
+    `[fv][fa][mv][ma]concat=n=2:v=1:a=1[v][a]`,
+  ].join(';');
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', face, '-i', `${DIR}/lower-third.png`, '-i', `${DIR}/relief-net-demo.mp4`, '-filter_complex', faceFilter, '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-crf', '19', '-preset', 'slow', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', `${DIR}/relief-net-demo-final.mp4`]);
+}
+
 const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const script = m.scenes.map((s, i) => {
   const text = m.scenesText.find((x) => x.id === s.id);
   const next = m.scenes[i + 1] ? mapTime(m.scenes[i + 1].t) : total;
-  return `**${mmss(mapTime(s.t))}–${mmss(next)} · ${text.title}**\n\n${text.text}\n`;
+  return `**${mmss(offset + mapTime(s.t))}–${mmss(offset + next)} · ${text.title}**\n\n${text.text}\n`;
 });
-writeFileSync(`${DIR}/timecodes.md`, `# relief-net demo · narration (${mmss(total)})\n\n${script.join('\n')}`);
-console.log(`→ ${DIR}/relief-net-demo.mp4 (${mmss(total)}), relief-net-demo-silent.mp4, timecodes.md`);
+const intro = face ? `**0:00–${mmss(offset)} · Intro to camera**\n\n(your own words)\n\n` : '';
+writeFileSync(`${DIR}/timecodes.md`, `# relief-net demo · narration (${mmss(offset + total)})\n\n${intro}${script.join('\n')}`);
+console.log(`→ ${DIR}/relief-net-demo.mp4 (${mmss(total)}), relief-net-demo-silent.mp4, timecodes.md${face ? `, relief-net-demo-final.mp4 (${mmss(offset + total)})` : ''}`);

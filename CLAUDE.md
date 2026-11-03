@@ -1,6 +1,6 @@
 # relief-net — Meta Global AI Developer Hackathon (Indie track, team "Saetas")
 
-AI coordination layer for community disaster response. Personal project by Javier, **unrelated to any employer or client**. Never name any employer or client anywhere in this project.
+AI coordination layer for community disaster response. Personal project by Javier, **unrelated to any employer or client**. Never name any employer or client anywhere in this project. One exception, approved by the author on Nov 3: the author's past work at Spain's Military Emergencies Unit (UME) may be mentioned as personal background (demo video, author note), always stating that relief-net is not affiliated with the UME and never using its logos or insignia.
 
 **Language: everything in this project is in English** — code, comments, UI copy, docs, commit messages, PR/issue text and the repo itself.
 

@@ -278,7 +278,7 @@ flowchart LR
 
 ## 🎬 How the demo video is made
 
-The 3-minute video is recorded from the real app, not mocked: `scripts/demo/record.mjs` drives Chrome through the whole flow on a local production build with the synthetic scenario (a new video report, triage on open weights, a merge, the matching agent on the Meta API, an approval, the report and the audit log). Model calls run live; `scripts/demo/edit.mjs` speeds up only the waits for them, each labelled *“⏩ Sped up · … took N s”*, and lays the narration (`scripts/demo/scenes.json`) over each scene. A take with a failed model call is discarded, not edited around.
+The 3-minute video is recorded from the real app, not mocked: `scripts/demo/record.mjs` drives Chrome through the whole flow on a local production build with the synthetic scenario (a new video report, triage on open weights, a merge, the matching agent on the Meta API, an approval, the report and the audit log). Model calls run live; `scripts/demo/edit.mjs` speeds up only the waits for them, each labelled *“⏩ Sped up · … took N s”*, and lays the narration (`scripts/demo/scenes.json`) over each scene. A take with a failed model call is discarded, not edited around. The video opens with a short intro to camera by the author, with an on-screen note that relief-net is a personal project, not affiliated with any employer.
 
 ## 🧩 Architecture
 
