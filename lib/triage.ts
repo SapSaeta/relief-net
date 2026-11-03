@@ -122,17 +122,21 @@ function describe(c: IntakeCase & { request: NonNullable<IntakeCase["request"]> 
 }
 
 async function askModel(model: Llm, prompt: string, ledger: UsageLedger): Promise<ModelTriage> {
-  const started = Date.now();
-  const response = await model.client.responses.create({
-    model: model.model,
-    instructions: INSTRUCTIONS,
-    max_output_tokens: 16000, // reasoning shares this budget
-    text: { format: { type: "json_schema", name: "triage", strict: true, schema: TRIAGE_SCHEMA } },
-    input: prompt,
-  });
-  ledger.addTokens(model.provider, model.model, "triage", Date.now() - started, response.usage);
-  if (response.status === "incomplete") throw new Error(`Triage incomplete: ${response.incomplete_details?.reason ?? "unknown reason"}`);
-  return JSON.parse(response.output_text) as ModelTriage;
+  // Reasoning shares the output budget and sometimes runs past it: one retry, then a visible error.
+  for (let attempt = 1; ; attempt++) {
+    const started = Date.now();
+    const response = await model.client.responses.create({
+      model: model.model,
+      instructions: INSTRUCTIONS,
+      max_output_tokens: 32000,
+      text: { format: { type: "json_schema", name: "triage", strict: true, schema: TRIAGE_SCHEMA } },
+      input: prompt,
+    });
+    ledger.addTokens(model.provider, model.model, "triage", Date.now() - started, response.usage);
+    if (response.status === "incomplete" && attempt < 2) continue;
+    if (response.status === "incomplete") throw new Error(`Triage incomplete: ${response.incomplete_details?.reason ?? "unknown reason"}`);
+    return JSON.parse(response.output_text) as ModelTriage;
+  }
 }
 
 /** `save: false` runs without replacing the dashboard's triage (used by scripts/eval-injection.mjs). */

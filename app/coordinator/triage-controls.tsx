@@ -47,7 +47,14 @@ export function TriageControls({
   }
 
   return (
-    <form action={run} className="flex flex-col gap-2">
+    <form
+      // onSubmit, not a form action: state set inside an action only renders when it ends, so "running" never showed.
+      onSubmit={(e) => {
+        e.preventDefault();
+        void run(new FormData(e.currentTarget));
+      }}
+      className="flex flex-col gap-2"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <select
           name="provider"

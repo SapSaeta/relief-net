@@ -115,7 +115,14 @@ export function IntakeTabs({ uploadMode = "multipart" }: { uploadMode?: "blob" |
         ))}
       </div>
 
-      <form action={submit} className="flex flex-col gap-5 rounded-xl border border-foreground/15 p-5">
+      <form
+        // onSubmit, not a form action: state set inside an action only renders when it ends, so "running" never showed.
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit(new FormData(e.currentTarget));
+        }}
+        className="flex flex-col gap-5 rounded-xl border border-foreground/15 p-5"
+      >
         {tab === "video" ? <VideoFields disabled={running} /> : <MessageFields disabled={running} />}
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="font-medium">Address or area</span>

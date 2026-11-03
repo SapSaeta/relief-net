@@ -112,7 +112,7 @@ async function draft(intake: IntakeCase, ledger: UsageLedger, feedback?: string)
   const response = await meta().responses.create({
     model: models.text,
     instructions: INSTRUCTIONS,
-    max_output_tokens: 8000, // reasoning shares this budget
+    max_output_tokens: 16000, // reasoning shares this budget
     text: { format: { type: "json_schema", name: "damage_report", strict: true, schema: REPORT_SCHEMA } },
     input: [
       "CASE FACTS",

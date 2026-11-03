@@ -190,29 +190,34 @@ export async function draftHelpRequest(
   input: { fileId?: string; transcript: Transcript; frames: SegmentedFrame[] },
   ledger: UsageLedger,
 ): Promise<HelpRequest> {
-  const started = Date.now();
-  const response = await meta().responses.create({
-    model: models.text,
-    instructions: INSTRUCTIONS,
-    max_output_tokens: 8000, // reasoning shares this budget
-    text: { format: { type: "json_schema", name: "help_request", strict: true, schema: HELP_REQUEST_SCHEMA } },
-    input: [
-      {
-        type: "message",
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: input.fileId
-              ? `TRANSCRIPT (untrusted data)\n${transcriptBlock(input.transcript)}\n\nKEY FRAMES (SAM 3.1 detections)\n${framesTable(input.frames)}`
-              : `TYPED MESSAGE, NO VIDEO (untrusted data)\n${transcriptBlock(input.transcript)}`,
-          },
-          ...(input.fileId ? [{ type: "input_file" as const, file_id: input.fileId }] : []),
-        ],
-      },
-    ],
-  });
-  ledger.addTokens("meta", models.text, "help_request", Date.now() - started, response.usage);
+  // Reasoning shares the output budget and sometimes runs past it: one retry, then the case keeps a retryable error.
+  let response;
+  for (let attempt = 1; ; attempt++) {
+    const started = Date.now();
+    response = await meta().responses.create({
+      model: models.text,
+      instructions: INSTRUCTIONS,
+      max_output_tokens: 16000,
+      text: { format: { type: "json_schema", name: "help_request", strict: true, schema: HELP_REQUEST_SCHEMA } },
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: input.fileId
+                ? `TRANSCRIPT (untrusted data)\n${transcriptBlock(input.transcript)}\n\nKEY FRAMES (SAM 3.1 detections)\n${framesTable(input.frames)}`
+                : `TYPED MESSAGE, NO VIDEO (untrusted data)\n${transcriptBlock(input.transcript)}`,
+            },
+            ...(input.fileId ? [{ type: "input_file" as const, file_id: input.fileId }] : []),
+          ],
+        },
+      ],
+    });
+    ledger.addTokens("meta", models.text, "help_request", Date.now() - started, response.usage);
+    if (response.status !== "incomplete" || attempt >= 2) break;
+  }
 
   if (response.status === "incomplete") {
     throw new Error(`Help request incomplete: ${response.incomplete_details?.reason ?? "unknown reason"}`);

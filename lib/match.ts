@@ -321,7 +321,7 @@ export async function runMatching(provider?: Provider): Promise<MatchRun> {
         model: model.model,
         instructions: INSTRUCTIONS,
         tools: TOOLS as never,
-        max_output_tokens: 8000, // reasoning shares this budget
+        max_output_tokens: 16000, // reasoning shares this budget
         input: input as never,
       });
       ledger.addTokens(model.provider, model.model, "match", Date.now() - roundStarted, response.usage);
