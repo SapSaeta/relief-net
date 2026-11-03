@@ -276,6 +276,10 @@ flowchart LR
 
 <sub>Actions taken before the log existed (Oct 29 intake, triage and merge) were rebuilt from the stored records with their original times and are marked *backfilled* (`scripts/backfill-audit.mjs`).</sub>
 
+## 🎬 How the demo video is made
+
+The 3-minute video is recorded from the real app, not mocked: `scripts/demo/record.mjs` drives Chrome through the whole flow on a local production build with the synthetic scenario (a new video report, triage on open weights, a merge, the matching agent on the Meta API, an approval, the report and the audit log). Model calls run live; `scripts/demo/edit.mjs` speeds up only the waits for them, each labelled *“⏩ Sped up · … took N s”*, and lays the narration (`scripts/demo/scenes.json`) over each scene. A take with a failed model call is discarded, not edited around.
+
 ## 🧩 Architecture
 
 ```mermaid
@@ -504,6 +508,7 @@ relief-net/
 │   ├── check-meta-api.mjs       # API key + model access check
 │   ├── check-open-weights.mjs   # Muse Spark Open on Baseten: Responses, tools, strict JSON
 │   ├── seed-scenario.mjs        # posts the synthetic scenario to a running server
+│   ├── demo/                    # 3-min demo video: scenes + narration, Chrome recording (playwright-core), ffmpeg edit
 │   ├── eval-triage.mjs          # triage per provider + manual runs, scored → docs/evidence/baseline-comparison.md
 │   ├── eval-injection.mjs       # repeats triage per provider; injection pass rate + latency
 │   ├── publish-snapshot.mjs     # copies the local synthetic scenario to production Redis

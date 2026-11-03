@@ -1,0 +1,62 @@
+[
+  {
+    "id": "intro",
+    "title": "The problem",
+    "text": "After a flood, hundreds of homes ask for help at once. Volunteer coordinators get videos, messages and duplicates, and must decide who goes where, fast. relief-net is an AI coordination layer built on Meta's models, with a person approving every dispatch."
+  },
+  {
+    "id": "home",
+    "title": "relief-net",
+    "text": "This demo runs on Riverside, a fully synthetic flood: fifteen requests, ten volunteers and eight kinds of supplies."
+  },
+  {
+    "id": "intake",
+    "title": "Intake",
+    "text": "A resident films the damage and describes it out loud. Muse Voice Transcribe turns the speech into text, Muse Spark picks what to look for in the key frames, and SAM 3.1 marks the damage."
+  },
+  {
+    "id": "case",
+    "title": "Verified help request",
+    "text": "The result is a structured help request. Every need and every piece of damage cites the person's own words or a frame, and code checks each citation. What cannot be verified is marked, never hidden."
+  },
+  {
+    "id": "triage",
+    "title": "Triage",
+    "text": "The coordinator sees every open request. Here the open-weights Muse Spark on Baseten orders them and spots duplicates, with a reason for each. Safety tiers come from code, not the model: the family trapped by rising water is first, with a 112 flag."
+  },
+  {
+    "id": "duplicates",
+    "title": "Duplicates",
+    "text": "Duplicates merge on their own only when each request's own words back it and the locations match. When they do not, the coordinator confirms."
+  },
+  {
+    "id": "matching",
+    "title": "Matching agent",
+    "text": "Next, a matching agent on the Meta API calls tools to find volunteers and check supplies. Code checks every proposal: skills, stock, an electrician where there is an electrical hazard, and no volunteers sent into a 112 emergency."
+  },
+  {
+    "id": "approve",
+    "title": "Human approval",
+    "text": "Nothing is dispatched until a person approves it. The decision is final, and it goes to the audit log."
+  },
+  {
+    "id": "report",
+    "title": "Report for the household",
+    "text": "For the household, Muse Spark drafts a report for insurance or public aid, with verified citations and no valuations or advice."
+  },
+  {
+    "id": "audit",
+    "title": "Audit log",
+    "text": "Every action, by the public, the model, a code rule or the coordinator, goes to an append-only audit log."
+  },
+  {
+    "id": "measured",
+    "title": "Measured",
+    "text": "On this scenario, both providers passed all seven triage checks in ten of ten runs, in under a minute. A quick manual pass took almost three minutes and missed both duplicates."
+  },
+  {
+    "id": "outro",
+    "title": "relief-net",
+    "text": "relief-net. The AI proposes, people decide. Every person and place in this demo is synthetic."
+  }
+]
