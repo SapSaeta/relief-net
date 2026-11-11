@@ -13,6 +13,8 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 
 import { chromium } from 'playwright-core';
 
+import { CARDS, cardHtml } from './card.mjs';
+
 const BASE = process.argv[2] ?? 'http://localhost:3004';
 const OUT = 'private/video';
 const VIDEO_FIXTURE = 'private/fixtures/intake-flood.mp4';
@@ -94,12 +96,8 @@ async function scrollBy(y, ms = 1500) {
   await sleep(ms);
 }
 
-async function card(title, subtitle, foot = '') {
-  await page.setContent(`<!doctype html><html style="background:#0a0a0a;color:#ededed;font-family:-apple-system,Helvetica,Arial,sans-serif">
-    <body style="margin:0;height:100vh;display:flex;flex-direction:column;justify-content:center;padding:0 140px;box-sizing:border-box">
-    <div style="font-size:84px;font-weight:600;letter-spacing:-2px">${title}</div>
-    <div style="font-size:34px;color:#a1a1a1;margin-top:20px;max-width:1100px;line-height:1.35">${subtitle}</div>
-    <div style="font-size:22px;color:#6b6b6b;margin-top:48px">${foot}</div></body></html>`);
+async function card(id) {
+  await page.setContent(cardHtml(...CARDS[id]));
 }
 
 const go = async (path) => {
@@ -115,7 +113,7 @@ const waitFor = (path) => page.waitForResponse((r) => r.url().includes(path) && 
 let caseUrl = '';
 
 await scene('intro', async () => {
-  await card('🛟 relief-net', 'From a phone video of a damaged home to a prioritized, evidence-backed help request, with a person approving every dispatch.', 'Muse Spark · SAM 3.1 · Muse Voice Transcribe · Muse Spark Open on Baseten');
+  await card('intro');
 });
 
 await scene('home', async () => {
@@ -225,7 +223,7 @@ await scene('measured', async () => {
 });
 
 await scene('outro', async () => {
-  await card('🛟 relief-net', 'The AI proposes. People decide.', 'All people, places and messages in this demo are synthetic · github.com/SapSaeta/relief-net');
+  await card('outro');
 });
 
 markers.end = now();

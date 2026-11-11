@@ -15,6 +15,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 
+import { CARDS, cardHtml } from './card.mjs';
+
 const DIR = 'private/video';
 const CUT_SECONDS = 3;
 const LEVEL = 'loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000';
@@ -111,7 +113,12 @@ badges.forEach((s, i) => {
   filters.push(`[${last}][${i + 1}:v]overlay=x=W-w-24:y=H-h-24:enable='between(t,${from.toFixed(2)},${(from + CUT_SECONDS).toFixed(2)})'[b${i}]`);
   last = `b${i}`;
 });
-const videoInputs = ['-i', `${DIR}/raw.webm`, ...badges.flatMap((_, i) => ['-i', `${DIR}/badge-${i}.png`])];
+// The opening card is drawn again at full size over its scene (it was recorded at half scale).
+writeFileSync(`${DIR}/card-intro.html`, cardHtml(...CARDS.intro));
+execFileSync(chrome, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--window-size=1440,900', `--screenshot=${DIR}/card-intro.png`, `file://${process.cwd()}/${DIR}/card-intro.html`], { stdio: 'ignore' });
+filters.push(`[${last}][${badges.length + 1}:v]overlay=0:0:enable='lt(t,${mapTime(m.scenes[1].t).toFixed(2)})'[card]`);
+last = 'card';
+const videoInputs = ['-i', `${DIR}/raw.webm`, ...badges.flatMap((_, i) => ['-i', `${DIR}/badge-${i}.png`]), '-i', `${DIR}/card-intro.png`];
 const total = mapTime(end);
 
 const encode = ['-map', `[${last}]`, '-c:v', 'libx264', '-crf', '19', '-preset', 'slow', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
