@@ -6,7 +6,9 @@
 
 From a phone video of a damaged home to a prioritized, evidence-backed help request, with a human coordinator approving every dispatch.
 
-**Live demo (review mode): [relief-net-one.vercel.app](https://relief-net-one.vercel.app)**
+**Live demo (review mode): [relief-net-one.vercel.app](https://relief-net-one.vercel.app)** · **🎬 [Demo video (2:45)](https://youtu.be/4v7YYTibZto)**
+
+[![relief-net demo video](https://img.youtube.com/vi/4v7YYTibZto/maxresdefault.jpg)](https://youtu.be/4v7YYTibZto)
 
 ![Hackathon](https://img.shields.io/badge/Meta_Global_AI_Developer_Hackathon-Indie_track-0866FF?style=for-the-badge&logo=meta&logoColor=white)
 
@@ -278,6 +280,8 @@ flowchart LR
 
 ## 🎬 How the demo video is made
 
+▶️ Watch it: [youtu.be/4v7YYTibZto](https://youtu.be/4v7YYTibZto) (English subtitles).
+
 The 3-minute video is recorded from the real app, not mocked: `scripts/demo/record.mjs` drives Chrome through the whole flow on a local production build with the synthetic scenario (a new video report, triage on open weights, a merge, the matching agent on the Meta API, an approval, the report and the audit log). Model calls run live; `scripts/demo/edit.mjs` speeds up only the waits for them, each labelled *“⏩ Sped up · … took N s”*, and lays the narration (`scripts/demo/scenes.json`) over each scene. A take with a failed model call is discarded, not edited around. The video opens with a short intro to camera by the author, with an on-screen note that relief-net is a personal project, not affiliated with any employer. The narration is the author's own voice, recorded one scene at a time with `scripts/demo/voice.mjs` (it shows each scene's text and how long it lasts on screen, and records with macOS's own recorder, `scripts/demo/rec.swift`), so every clip starts with its scene; the edit cuts off the key press that ended each take, evens out the levels and drops still frames at the end of a scene down to the length of the recorded voice. Subtitles (`scripts/demo/subtitles.mjs`) come from Muse Voice Transcribe: its turn timestamps time the exact script of each scene, and the intro to camera uses the transcript itself.
 
 ## 🧩 Architecture
@@ -359,8 +363,8 @@ Only Standard models are used. The `*-contributor` variants are avoided so that 
 | Oct 31 | Human approval, audit log, safety rules | ✅ (Nov 1) |
 | Nov 1 | Insurance/aid draft report, full synthetic end-to-end scenario | ✅ intake → triage → matching → approval → report |
 | Nov 2 | Measurement vs manual baseline (15 requests), Meta API vs open weights | ✅ both providers 7/7 in 5 of 5 runs (44 s / 23 s); by hand 2/7 in 2.8 min |
-| Nov 3 | Polish, Vercel deploy, demo video | ⬜ |
-| Nov 4 | Submission | ⬜ |
+| Nov 3 | Polish, Vercel deploy, demo video | ✅ [video](https://youtu.be/4v7YYTibZto) |
+| Nov 4 | Submission | ✅ submitted |
 
 ```mermaid
 gantt
